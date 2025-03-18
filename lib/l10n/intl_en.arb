@@ -1,0 +1,10 @@
+{
+  "appTitle": "ZETA-BOX",
+  "status": "Status",
+  "arriveTime": "Arrival Time",
+  "leaveTime": "Leave Time",
+  "hoursWorked": "Hours Worked",
+  "overtime": "Overtime",
+  "absences": "Absences",
+  "delays": "Delays"
+}

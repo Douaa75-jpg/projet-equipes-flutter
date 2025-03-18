@@ -1,0 +1,10 @@
+{
+  "appTitle": "ZETA-BOX",
+  "status": "الحالة",
+  "arriveTime": "وقت الوصول",
+  "leaveTime": "وقت المغادرة",
+  "hoursWorked": "الساعات العمل",
+  "overtime": "الساعات الإضافية",
+  "absences": "الغيابات",
+  "delays": "التأخيرات"
+}

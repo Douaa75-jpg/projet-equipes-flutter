@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/home/home_page.dart';
+
 import 'choice_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -19,21 +18,14 @@ class SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNextScreen() async {
-    final isAuthenticated = await _checkAuthentication();
-
     Timer(const Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => isAuthenticated ? HomeScreen() : const ChoiceScreen(),
+          builder: (context) => const ChoiceScreen(),
         ),
       );
     });
-  }
-
-  Future<bool> _checkAuthentication() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('isAuthenticated') ?? false; // Remplacer par la logique appropriée
   }
 
   @override

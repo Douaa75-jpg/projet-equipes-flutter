@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'AuthProvider.dart';  // Assurez-vous d'importer AuthProvider
+import 'AuthProvider.dart'; // Assurez-vous d'importer AuthProvider
 import 'theme_notifier.dart';
 import 'theme.dart' as app_theme; // Utilisation d'un alias pour le thème
 import 'splash_screen.dart';
@@ -10,8 +10,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => AuthProvider(),  // Ajout d'AuthProvider
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>(
+            create: (context) =>
+                AuthProvider()), // Spécification explicite du type pour AuthProvider
+        ChangeNotifierProvider(
+            create: (_) => ThemeNotifier()), // Fournisseur pour le thème
+        ChangeNotifierProvider(
+            create: (_) => LanguageNotifier()), // Fournisseur pour la langue
+      ],
       child: const MyApp(),
     ),
   );
@@ -35,9 +43,10 @@ class MyApp extends StatelessWidget {
                 ? app_theme.darkTheme // Utilisation du thème sombre
                 : app_theme.lightTheme, // Utilisation du thème clair
             routes: {
-              '/': (context) => const SplashScreen(), // Page d'accueil (SplashScreen)
+              '/': (context) =>
+                  const SplashScreen(), // Page d'accueil (SplashScreen)
               '/employee_dashboard': (context) =>
-                  const EmployeeDashboardScreen(), // Dashboard pour l'employé
+                   EmployeeDashboard(), // Dashboard pour l'employé
             },
             locale: Provider.of<LanguageNotifier>(context).locale,
             supportedLocales: const [

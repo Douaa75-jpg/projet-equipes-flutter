@@ -1,170 +1,124 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
-import '../../services/api_service.dart';
+import 'package:intl/intl.dart';
 import '../../AuthProvider.dart';
-import '../leave/demande_congé.dart';
-import '../leave/demande_sortie.dart';
-import '../leave/HistoriqueDemandesPage.dart';
-import '../pointage/HistoriquePointagesScreen.dart';
-import '../pointage/PointagePage.dart';
-import '../../DeconnexionScreen.dart';
-import '../../ParametresScreen.dart';
-import '../../theme.dart';
+import '../../services/pointage_service.dart';
 
-class EmployeeDashboardScreen extends StatefulWidget {
-  const EmployeeDashboardScreen({Key? key}) : super(key: key);
-
+class EmployeeDashboard extends StatefulWidget {
   @override
-  _EmployeeDashboardScreenState createState() => _EmployeeDashboardScreenState();
+  _EmployeeDashboardState createState() => _EmployeeDashboardState();
 }
 
-class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
-  late String employeId;
-  Map<String, dynamic> pointageData = {};
-  bool isLoading = true;
+class _EmployeeDashboardState extends State<EmployeeDashboard> {
+  final PointageService _pointageService = PointageService();
+  Map<String, dynamic>? _pointage;
+  List<dynamic> _historique = [];
+  bool _isLoading = true;
+  String _statut = "Chargement...";
+  int _totalHeures = 0;
+  int _totalHeuresSup = 0;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _loadPointage();
   }
 
-  Future<void> _fetchData() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    employeId = authProvider.employeeId ?? ''; // Récupération de l'ID de l'utilisateur connecté
-    
+  Future<void> _loadPointage() async {
     try {
-      var data = await ApiService().getPointage(employeId);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.userId == null) {
+        throw Exception("Utilisateur non authentifié");
+      }
+
+      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      var pointage = await _pointageService.getPointage(authProvider.userId!, today);
+      var historique = await _pointageService.getHistorique(authProvider.userId!);
+      var result = await _pointageService.calculerHeuresTravail(authProvider.userId!, today, today);
+
       setState(() {
-        pointageData = data;
-        isLoading = false;
+        _pointage = pointage;
+        _statut = pointage['statut'] ?? "ABSENT"; // Si "statut" est absent, par défaut "ABSENT"
+        _historique = historique;
+        _totalHeures = result['totalHeures'] ?? 0; // Si 'totalHeures' est absent, mettre à 0
+        _totalHeuresSup = result['totalHeuresSup'] ?? 0; // Pareil pour 'totalHeuresSup'
+        _isLoading = false;
       });
-    } catch (error) {
-      print("Erreur lors du chargement des données : $error");
+    } catch (e) {
       setState(() {
-        isLoading = false;
+        _statut = "Erreur de chargement";
+        _isLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+    }
+  }
+
+  Future<void> _pointerArrivee() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.userId == null) {
+        throw Exception("Utilisateur non authentifié");
+      }
+      
+      String heureArrivee = DateFormat('HH:mm:ss').format(DateTime.now());
+      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+      await _pointageService.enregistrerPointage({
+        "employeId": authProvider.userId!,
+        "date": today,
+        "heureArrivee": heureArrivee,
+      });
+      
+      _loadPointage();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text("Tableau de bord"),
+        title: Text('Bonjour, ${authProvider.nom ?? "Utilisateur"}'),
       ),
-      body: isLoading
+      body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+          : Padding(
+              padding: EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Bonjour, ${pointageData['nom'] ?? 'Employé'} !", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text('Tableau de bord de employé', style: TextStyle(fontSize: 24)),
                   SizedBox(height: 20),
-                  _buildStatutCard(),
+                  Text('Nom: ${authProvider.nom ?? "Non disponible"}', style: TextStyle(fontSize: 18)),
                   SizedBox(height: 20),
-                  _buildStatsGrid(MediaQuery.of(context).size.width),
+                  Text("Statut: $_statut", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   SizedBox(height: 20),
-                  _buildGraphique(),
+                  ElevatedButton(
+                    onPressed: _statut == "ABSENT" ? _pointerArrivee : null,
+                    child: Text("Pointer l'arrivée"),
+                  ),
+                  SizedBox(height: 20),
+                  Text("Heures travaillées: $_totalHeures"),
+                  Text("Heures supplémentaires: $_totalHeuresSup"),
+                  SizedBox(height: 20),
+                  Text("Historique des pointages", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _historique.length,
+                      itemBuilder: (context, index) {
+                        var pointage = _historique[index];
+                        return ListTile(
+                          title: Text("Date: ${pointage['date'] ?? 'Inconnue'}"),
+                          subtitle: Text("Statut: ${pointage['statut'] ?? 'Non défini'}"),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: Icon(Icons.check),
-        tooltip: "Pointer l'arrivée",
-      ),
-    );
-  }
-
-  Widget _buildStatutCard() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildStatInfo("Statut", pointageData['statut'] ?? "Inconnu"),
-            _buildStatInfo("Arrivée", pointageData['heureArrivee'] ?? "--:--"),
-            _buildStatInfo("Départ", pointageData['heureDepart'] ?? "--:--"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsGrid(double screenWidth) {
-    return GridView.count(
-      shrinkWrap: true,
-      crossAxisCount: screenWidth > 600 ? 3 : 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.5,
-      physics: NeverScrollableScrollPhysics(),
-      children: [
-        _buildStatCard("Heures de travail", "${pointageData['heuresTravail'] ?? 0} h", Icons.access_time),
-        _buildStatCard("Heures sup.", "${pointageData['heuresSup'] ?? 0} h", Icons.timer),
-        _buildStatCard("Absences", "${pointageData['absences'] ?? 0}", Icons.event_busy),
-        _buildStatCard("Retards", "${pointageData['retards'] ?? 0}", Icons.schedule),
-      ],
-    );
-  }
-
-  Widget _buildGraphique() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: AspectRatio(
-          aspectRatio: 1.7,
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(show: false),
-              titlesData: FlTitlesData(show: false),
-              borderData: FlBorderData(show: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: [FlSpot(0, 1), FlSpot(1, 3), FlSpot(2, 2)],
-                  isCurved: true,
-                  color: Colors.blue,
-                  dotData: FlDotData(show: false),
-                  belowBarData: BarAreaData(show: false),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32),
-            SizedBox(height: 10),
-            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatInfo(String title, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        SizedBox(height: 5),
-        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }

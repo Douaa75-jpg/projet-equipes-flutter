@@ -1,32 +1,93 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart'; // Make sure to include this dependency
 
 class AuthProvider with ChangeNotifier {
   String? _token;
-  String? _employeeId;
   String? _role;
+  String? _typeResponsable;
+  String? _userId;
+  String? _nom; // إضافة حقل الاسم
+  bool _isAuthenticated = false;
+  final FlutterSecureStorage _storage = FlutterSecureStorage();
 
   String? get token => _token;
-  String? get employeeId => _employeeId;
   String? get role => _role;
+  String? get typeResponsable => _typeResponsable;
+  String? get nom => _nom; // توفير الـ getter لاسم المستخدم
+  bool get isAuthenticated => _isAuthenticated;
+  String? get userId => _userId;
 
-  // تعيين التوكن والمعرف
-  void setAuthData(String? token, String? employeeId, String? role) {
-  _token = token ?? ''; // Assurer que _token n'est jamais null
-  _employeeId = employeeId ?? ''; // Idem pour _employeeId
-  _role = role ?? ''; // Idem pour _role
-  notifyListeners();
-}
+  // Method to login the user
+  Future<Map<String, dynamic>> login(String email, String motDePasse) async {
+    final url = Uri.parse('http://localhost:3000/auth/login');
 
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email, 'motDePasse': motDePasse}),
+    );
 
-  // حذف بيانات التوثيق عند تسجيل الخروج
-  void clearAuthData() {
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final responseData = json.decode(response.body);
+      _token = responseData['access_token'];
+      _role = responseData['user']['role'];
+      _typeResponsable = responseData['user']['typeResponsable'];
+      _userId = responseData['user']['id'];
+      _nom = responseData['user']['nom']; // استخراج الاسم من الاستجابة
+      _isAuthenticated = true;
+
+      // Store token securely
+      await _storage.write(key: 'jwt_token', value: _token);
+
+      notifyListeners();
+
+      return {'role': _role, 'typeResponsable': _typeResponsable ?? ''};
+    } else {
+      throw Exception('Erreur serveur : ${response.statusCode}');
+    }
+  }
+
+  // Method to logout the user
+  Future<void> logout() async {
     _token = null;
-    _employeeId = null;
     _role = null;
+    _typeResponsable = null;
+    _userId = null;
+    _nom = null; // إلغاء تخزين الاسم عند تسجيل الخروج
+    _isAuthenticated = false;
+
+    // Remove token from secure storage
+    await _storage.delete(key: 'jwt_token');
+
     notifyListeners();
   }
 
-  // التحقق من وجود التوكن
-  bool get isAuthenticated => _token != null;
+  Future<Map<String, dynamic>?> getUserData() async {
+    String? token = await _storage.read(key: 'jwt_token');
+
+    if (token == null || JwtDecoder.isExpired(token)) {
+      return null;
+    }
+
+    Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+
+    // تحديث البيانات داخل AuthProvider
+    _userId = decodedToken['id'];
+    _role = decodedToken['role'];
+    _typeResponsable = decodedToken['typeResponsable'];
+    _nom = decodedToken['nom']; // استخراج الاسم من الـ JWT
+
+    notifyListeners();
+
+    return {
+      'id': _userId,
+      'email': decodedToken['email'],
+      'role': _role,
+      'typeResponsable': _typeResponsable,
+      'nom': _nom, // إضافة الاسم للـ response
+    };
+  }
 }

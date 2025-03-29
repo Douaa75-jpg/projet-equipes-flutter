@@ -31,7 +31,9 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         throw Exception("Utilisateur non authentifié");
       }
 
-      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+       String today = DateFormat('yyyy-MM-ddTHH:mm:ss').format(DateTime.now()); // Format ISO
+      print('Date envoyée pour le pointage: $today');
+
       var pointage = await _pointageService.getPointage(authProvider.userId!, today);
       var historique = await _pointageService.getHistorique(authProvider.userId!);
       var result = await _pointageService.calculerHeuresTravail(authProvider.userId!, today, today);
@@ -45,6 +47,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         _isLoading = false;
       });
     } catch (e) {
+      print("Erreur lors du chargement du pointage : $e");
       setState(() {
         _statut = "Erreur de chargement";
         _isLoading = false;
@@ -60,8 +63,14 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         throw Exception("Utilisateur non authentifié");
       }
       
-      String heureArrivee = DateFormat('HH:mm:ss').format(DateTime.now());
-      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String heureArrivee = DateTime.now().toUtc().toIso8601String();
+      String today = DateTime.now().toUtc().toIso8601String();
+
+
+      print('Données envoyées pour le pointage :');
+      print('Date : $today');
+      print('Heure d\'arrivée : $heureArrivee');
+
 
       await _pointageService.enregistrerPointage({
         "employeId": authProvider.userId!,
@@ -71,6 +80,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
       
       _loadPointage();
     } catch (e) {
+      print("Erreur lors de l'enregistrement du pointage : $e");
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
     }
   }

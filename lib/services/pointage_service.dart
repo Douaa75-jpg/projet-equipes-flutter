@@ -6,6 +6,7 @@ class PointageService {
 
   Future<Map<String, dynamic>> getPointage(String employeId, String date) async {
     final response = await http.get(Uri.parse('$baseUrl/$employeId?date=$date'));
+    print('Réponse API getPointage : ${response.body}');
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -20,6 +21,7 @@ class PointageService {
     headers: {"Content-Type": "application/json"},
     body: json.encode(data),
   );
+  print('Réponse API enregistrerPointage : ${response.body}');
   if (response.statusCode != 201) {
     throw Exception('Échec de l’enregistrement du pointage');
   }
@@ -28,6 +30,8 @@ class PointageService {
 
   Future<Map<String, dynamic>> calculerHeuresTravail(String employeId, String dateDebut, String dateFin) async {
     final response = await http.get(Uri.parse('$baseUrl/calcul-heures?employeId=$employeId&dateDebut=$dateDebut&dateFin=$dateFin'));
+    print('Réponse API calculerHeuresTravail : ${response.body}');
+
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -36,6 +40,7 @@ class PointageService {
   }
   Future<List<dynamic>> getHistorique(String employeId) async {
   final response = await http.get(Uri.parse('$baseUrl/historique/$employeId'));
+  print('Réponse API getHistorique : ${response.body}');
 
   if (response.statusCode == 200) {
     return json.decode(response.body);

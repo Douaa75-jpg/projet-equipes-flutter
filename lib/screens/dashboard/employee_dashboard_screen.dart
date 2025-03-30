@@ -31,11 +31,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         throw Exception("Utilisateur non authentifié");
       }
 
-       String today = DateFormat('yyyy-MM-ddTHH:mm:ss').format(DateTime.now()); // Format ISO
-      print('Date envoyée pour le pointage: $today');
+       String today = DateFormat('yyyy-MM-dd').format(DateTime.now());  // Format ISO
+       print('Date envoyée pour le pointage: $today');
 
       var pointage = await _pointageService.getPointage(authProvider.userId!, today);
-      var historique = await _pointageService.getHistorique(authProvider.userId!);
+      var historique = await _pointageService.getHistorique(authProvider.userId!)?? [];
       var result = await _pointageService.calculerHeuresTravail(authProvider.userId!, today, today);
 
       setState(() {
@@ -46,6 +46,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         _totalHeuresSup = result['totalHeuresSup'] ?? 0; // Pareil pour 'totalHeuresSup'
         _isLoading = false;
       });
+      print('Statut chargé: $_statut');
     } catch (e) {
       print("Erreur lors du chargement du pointage : $e");
       setState(() {

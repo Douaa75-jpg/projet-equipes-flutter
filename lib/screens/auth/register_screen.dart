@@ -26,7 +26,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(
+        title: const Text('Créer un compte'),
+        backgroundColor: Colors.blueAccent,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Form(
@@ -37,24 +40,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 widget.role == 'employe'
                     ? 'Créer un employé'
                     : 'Créer un responsable',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent,
+                ),
               ),
               const SizedBox(height: 20),
               _buildTextField(_nomController, "Nom"),
+              const SizedBox(height: 12),
               _buildTextField(_prenomController, "Prénom"),
+              const SizedBox(height: 12),
               _buildTextField(_emailController, "Email", isEmail: true),
-              _buildTextField(_motDePasseController, "Mot de Passe",
-                  isPassword: true),
+              const SizedBox(height: 12),
+              _buildTextField(_motDePasseController, "Mot de Passe", isPassword: true),
+              const SizedBox(height: 12),
               if (widget.role == 'responsable')
-                _buildTextField(
-                    _typeResponsableController, "Type de Responsable"),
+                _buildTextField(_typeResponsableController, "Type de Responsable"),
               const SizedBox(height: 20),
               _isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
                       onPressed: _submitForm,
-                      child: const Text('Créer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14.0, horizontal: 20.0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30.0),
+                        ),
+                      ),
+                      child: const Text(
+                        'Créer',
+                        style: TextStyle(fontSize: 16),
+                      ),
                     ),
             ],
           ),
@@ -67,7 +86,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       {bool isPassword = false, bool isEmail = false}) {
     return TextFormField(
       controller: controller,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label, // Affiche le label au-dessus du champ
+        hintText: "Entrer votre $label", // Affiche un texte dans le champ comme exemple
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+      ),
       obscureText: isPassword,
       validator: (value) {
         if (value == null || value.isEmpty) {
@@ -87,13 +113,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = true;
       });
 
-      // Déclaration correcte avec String? pour accepter null
       String typeResponsable = widget.role == 'responsable'
           ? _typeResponsableController.text
           : ''; // Si c'est un employé, on envoie une chaîne vide, sinon le type de responsable
 
-      // Vérification que le typeResponsable est correct si le rôle est 'responsable'
-      if (widget.role == 'responsable' && !['RH', 'CHEF_EQUIPE'].contains(typeResponsable)) {
+      if (widget.role == 'responsable' &&
+          !['RH', 'CHEF_EQUIPE'].contains(typeResponsable)) {
         _showSnackBar("Type de responsable doit être RH ou CHEF_EQUIPE.", isError: true);
         setState(() {
           _isLoading = false;
@@ -101,8 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // Envoi de la requête en fonction du rôle
-      final response = widget.role == 'employe'  // Corriger 'EMPLOYE' en 'employe'
+      final response = widget.role == 'employe'
           ? await responsableService.createEmploye(
               _nomController.text,
               _prenomController.text,
@@ -114,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _prenomController.text,
               _emailController.text,
               _motDePasseController.text,
-              typeResponsable,  // Passer la chaîne de caractères uniquement pour les responsables
+              typeResponsable,
             );
 
       if (mounted) {
@@ -131,7 +155,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (response.statusCode == 201) {
       _showSnackBar("Création réussie !");
       Future.delayed(const Duration(seconds: 2), () {
-        Navigator.pop(context); // Retourner à l'écran précédent
+        Navigator.pop(context);
       });
     } else {
       _showSnackBar("Erreur: ${response.body}", isError: true);

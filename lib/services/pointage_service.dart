@@ -27,6 +27,54 @@ class PointageService {
   }
 }
 
+ // Enregistrer l'heure de départ
+  Future<void> enregistrerHeureDepart(String employeId, String date, String heureDepart) async {
+    if (employeId.isEmpty || date.isEmpty || heureDepart.isEmpty) {
+      throw Exception('Les paramètres employeId, date et heureDepart sont nécessaires.');
+    }
+    print('Données envoyées pour l\'heure de départ : { employeId: $employeId, date: $date , heureDepart: $heureDepart}');
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/depart/$employeId'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "date": date, // Date du pointage
+          "heureDepart": heureDepart, // Heure de départ
+        }),
+      );
+
+      print('Réponse API enregistrerHeureDepart (${response.statusCode}): ${response.body}');
+
+      if (response.statusCode != 200) {
+        throw Exception('Échec de l’enregistrement de l\'heure de départ (Code: ${response.statusCode})');
+      }
+    } catch (e) {
+      throw Exception('Erreur lors de l\'enregistrement de l\'heure de départ: $e');
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   Future<Map<String, dynamic>> calculerHeuresTravail(String employeId, String dateDebut, String dateFin) async {
     final response = await http.get(Uri.parse('$baseUrl/calcul-heures?employeId=$employeId&dateDebut=$dateDebut&dateFin=$dateFin'));

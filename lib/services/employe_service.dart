@@ -2,23 +2,61 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class EmployeService {
-  final String baseUrl = 'http://localhost:3000'; // Remplacez par votre URL API
+  final String baseUrl = 'http://localhost:3000/employes';
 
-  // Fonction pour récupérer les employés d'un responsable
-  Future<List<dynamic>> getEmployesByResponsable(String responsableId) async {
-    final url = Uri.parse('$baseUrl/employe/responsable/$responsableId/employes');
+  // Récupérer la liste des employés avec leurs responsables
+  Future<List<Employe>> getEmployees() async {
+    final response = await http.get(Uri.parse(baseUrl));
 
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        // Si la requête réussie, parse la réponse JSON
-        return json.decode(response.body);
-      } else {
-        throw Exception('Échec de la récupération des employés');
-      }
-    } catch (error) {
-      rethrow;
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((item) => Employe.fromJson(item)).toList();
+    } else {
+      throw Exception('Échec de récupération des employés');
     }
+  }
+}
+
+// Définition de la classe Employe
+class Employe {
+  final String nom;
+  final String prenom;
+  final String email;
+  final Responsable responsable;
+
+  Employe({
+    required this.nom,
+    required this.prenom,
+    required this.email,
+    required this.responsable,
+  });
+
+  factory Employe.fromJson(Map<String, dynamic> json) {
+    return Employe(
+      nom: json['utilisateur']['nom'] ?? '',
+      prenom: json['utilisateur']['prenom'] ?? '',
+      email: json['utilisateur']['email'] ?? '',
+      responsable: json['responsable'] != null
+          ? Responsable.fromJson(json['responsable'])
+          : Responsable(nom: 'Inconnu', prenom: 'Inconnu'),
+    );
+  }
+}
+
+// Définition de la classe Responsable
+class Responsable {
+  final String nom;
+  final String prenom;
+
+  Responsable({
+    required this.nom,
+    required this.prenom,
+  });
+
+  factory Responsable.fromJson(Map<String, dynamic> json) {
+    return Responsable(
+      nom: json['utilisateur']['nom'] ?? 'Inconnu',
+      prenom: json['utilisateur']['prenom'] ?? 'Inconnu',
+    );
   }
 }

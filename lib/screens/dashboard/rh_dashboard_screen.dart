@@ -4,6 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../AuthProvider.dart';
 import '../Notification_Screen.dart';
 import '../../services/RH_service.dart';
+import '../../services/notification_service.dart';
 import '../../theme.dart';
 
 class RHDashboardScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
   List<Employe> _employees = [];
   List<Responsable> _responsables = [];
   final RhService rhService = RhService();
+  final NotificationService _notificationService = NotificationService(); // NotificationService instance
   Widget _currentScreen = Center(
     child: Text(
       'Bienvenue dans l\'interface de ressource humain',
@@ -30,8 +32,22 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     _getCounts();
     _fetchEmployees();
     _fetchResponsables();
+    
+    // Connect to the notification service with user ID
+    _connectToNotificationService();
   }
 
+  // Function to connect to Notification Service
+  void _connectToNotificationService() {
+    Provider.of<AuthProvider>(context, listen: false).getUserData().then((userData) {
+      if (userData != null && userData['id'] != null) {
+        String userId = userData['id'].toString();
+        _notificationService.connect(userId, _handleNotification);
+      }
+    });
+  }
+
+  // Function to get the total counts of employees and responsables
   _getCounts() async {
     try {
       totalEmployes = await rhService.getEmployesCount();
@@ -42,6 +58,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     }
   }
 
+  // Fetch the employees list from the service
   _fetchEmployees() async {
     try {
       _employees = await rhService.getEmployees();
@@ -51,6 +68,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     }
   }
 
+  // Fetch the responsables list from the service
   _fetchResponsables() async {
     try {
       _responsables = await rhService.getResponsables();
@@ -60,10 +78,30 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     }
   }
 
+  // Handle incoming notifications
+  void _handleNotification(String message) {
+    // Show a Snackbar for new notification
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("🔔 Nouvelle demande: $message"),
+        backgroundColor: Colors.blueAccent,
+        duration: Duration(seconds: 5),
+      ),
+    );
+  }
+
+  // Show error message
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  // Disconnect notification service when disposing
+  @override
+  void dispose() {
+    _notificationService.disconnect();  // Disconnect from notification service when widget is disposed
+    super.dispose();
   }
 
   @override
@@ -71,19 +109,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        title: FutureBuilder<Map<String, dynamic>?>( 
-          future: Provider.of<AuthProvider>(context, listen: false).getUserData(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            } else if (snapshot.hasError || !snapshot.hasData) {
-              return const Text('Utilisateur non connecté');
-            } else {
-              String userName = snapshot.data?['nom'] ?? 'Utilisateur';
-              return Text('Bienvenue, $userName');
-            }
-          },
-        ),
+        title: _buildUserName(),
       ),
       drawer: _buildDrawer(),
       body: Padding(
@@ -105,6 +131,24 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // FutureBuilder to load and display user name
+  Widget _buildUserName() {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: Provider.of<AuthProvider>(context, listen: false).getUserData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
+        } else if (snapshot.hasError || !snapshot.hasData) {
+          return const Text('Utilisateur non connecté');
+        } else {
+          String userName = snapshot.data?['nom'] ?? 'Utilisateur';
+          return Text('Bienvenue, $userName');
+        }
+      },
+    );
+  }
+
+  // Drawer menu to navigate between screens
   Widget _buildDrawer() {
     return Drawer(
       child: Column(
@@ -131,6 +175,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // Build user header in the drawer
   Widget _buildUserHeader() {
     return FutureBuilder<Map<String, dynamic>?>( 
       future: Provider.of<AuthProvider>(context, listen: false).getUserData(),
@@ -169,6 +214,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // Drawer items
   Widget _buildDrawerItem(String title, IconData icon, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: const Color.fromARGB(255, 0, 0, 0)),
@@ -177,6 +223,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // Stat card displaying employee count or responsable count
   Widget _buildStatCard(String title, int count, IconData icon) {
     return Card(
       elevation: 8,
@@ -202,6 +249,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // Employees list
   Widget _buildEmployeesList() {
     if (_employees.isEmpty) {
       return Center(child: CircularProgressIndicator());
@@ -227,6 +275,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
+  // Responsables list with expandable items
   Widget _buildResponsablesList() {
     if (_responsables.isEmpty) {
       return Center(child: CircularProgressIndicator());

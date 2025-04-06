@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'AuthProvider.dart'; // Assurez-vous d'importer AuthProvider
 import 'theme_notifier.dart';
 import 'theme.dart' as app_theme; // Utilisation d'un alias pour le thème
-import 'splash_screen.dart';
+import 'screens/splash_screen.dart';
 import './screens/dashboard/employee_dashboard_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 

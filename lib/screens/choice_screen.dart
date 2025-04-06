@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
+import 'auth/login_screen.dart';
+import 'auth/register_screen.dart';
 
 class ChoiceScreen extends StatelessWidget {
   const ChoiceScreen({super.key});

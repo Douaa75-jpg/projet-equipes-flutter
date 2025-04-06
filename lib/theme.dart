@@ -1,62 +1,69 @@
 import 'package:flutter/material.dart';
 
-// Définition des couleurs principales
 class AppColors {
-  static const Color primary = Color(0xFFD32F2F); // Rouge
-  static const Color secondary = Color(0xFFD32F2F); // Bleu
-  static const Color lightSurface = Colors.white;
-  static const Color darkSurface = Colors.black;
-  static const Color textLight = Colors.black87;
-  static const Color textDark = Colors.white70;
+  // Couleurs inspirées du logo ZETABOX
+  static const Color primary = Color(0xFFB71C1C); // Rouge foncé
+  static const Color secondary = Color(0xFF880E4F); // Bordeaux
+  static const Color accent = Color(0xFFE53935); // Rouge clair pour boutons
+  static const Color surfaceLight = Color(0xFFF5F5F5); // Fond clair
+  static const Color surfaceDark = Color(0xFF121212); // Fond sombre
+  static const Color textDark = Color(0xFF212121); // Texte sur fond clair
+  static const Color textLight = Color(0xFFE0E0E0); // Texte sur fond sombre
 }
 
-// Définition du thème clair
+// Thème clair
 final ThemeData lightTheme = ThemeData(
   useMaterial3: true,
   colorScheme: ColorScheme.light(
     primary: AppColors.primary,
     secondary: AppColors.secondary,
-    surface: AppColors.lightSurface,
+    surface: AppColors.surfaceLight,
+    background: AppColors.surfaceLight,
     onPrimary: Colors.white,
     onSecondary: Colors.white,
-    onSurface: Colors.black,
+    onSurface: AppColors.textDark,
   ),
-  scaffoldBackgroundColor: AppColors.lightSurface,
-  textTheme: _buildTextTheme(AppColors.textLight),
-  elevatedButtonTheme: _buildButtonTheme(AppColors.primary),
-  inputDecorationTheme: _buildInputTheme(AppColors.primary, Colors.grey.shade400),
+  scaffoldBackgroundColor: AppColors.surfaceLight,
+  textTheme: _buildTextTheme(AppColors.textDark),
   appBarTheme: _buildAppBarTheme(AppColors.primary),
+  elevatedButtonTheme: _buildButtonTheme(AppColors.accent),
+  inputDecorationTheme: _buildInputTheme(AppColors.primary, Colors.grey.shade400),
+  cardTheme: _buildCardTheme(),
+  drawerTheme: DrawerThemeData(backgroundColor: Colors.white),
 );
 
-// Définition du thème sombre
+// Thème sombre
 final ThemeData darkTheme = ThemeData.dark().copyWith(
   useMaterial3: true,
   colorScheme: ColorScheme.dark(
     primary: AppColors.primary,
     secondary: AppColors.secondary,
-    surface: AppColors.darkSurface,
+    surface: AppColors.surfaceDark,
+    background: AppColors.surfaceDark,
     onPrimary: Colors.white,
     onSecondary: Colors.white,
-    onSurface: Colors.white,
+    onSurface: AppColors.textLight,
   ),
-  scaffoldBackgroundColor: AppColors.darkSurface,
-  textTheme: _buildTextTheme(AppColors.textDark),
-  elevatedButtonTheme: _buildButtonTheme(AppColors.primary),
-  inputDecorationTheme: _buildInputTheme(AppColors.primary, Colors.grey.shade700),
+  scaffoldBackgroundColor: AppColors.surfaceDark,
+  textTheme: _buildTextTheme(AppColors.textLight),
   appBarTheme: _buildAppBarTheme(AppColors.primary),
+  elevatedButtonTheme: _buildButtonTheme(AppColors.accent),
+  inputDecorationTheme: _buildInputTheme(AppColors.primary, Colors.grey.shade700),
+  cardTheme: _buildCardTheme(),
+  drawerTheme: DrawerThemeData(backgroundColor: Color(0xFF1E1E1E)),
 );
 
-// Fonction pour générer le TextTheme
+// TextTheme
 TextTheme _buildTextTheme(Color textColor) {
   return TextTheme(
-    displayLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-    titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textColor),
+    displayLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textColor),
+    titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: textColor),
     bodyLarge: TextStyle(fontSize: 16, color: textColor),
     bodyMedium: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7)),
   );
 }
 
-// Fonction pour générer le ElevatedButtonThemeData
+// ButtonTheme
 ElevatedButtonThemeData _buildButtonTheme(Color color) {
   return ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
@@ -64,12 +71,13 @@ ElevatedButtonThemeData _buildButtonTheme(Color color) {
       foregroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       padding: EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-      elevation: 3,
+      elevation: 4,
+      textStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
     ),
   );
 }
 
-// Fonction pour générer l'InputDecorationTheme
+// Input Theme
 InputDecorationTheme _buildInputTheme(Color primaryColor, Color borderColor) {
   return InputDecorationTheme(
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -79,16 +87,27 @@ InputDecorationTheme _buildInputTheme(Color primaryColor, Color borderColor) {
     enabledBorder: OutlineInputBorder(
       borderSide: BorderSide(color: borderColor, width: 1.5),
     ),
-    labelStyle: TextStyle(color: Colors.white70, fontSize: 16),
+    labelStyle: TextStyle(fontSize: 16),
   );
 }
 
-// Fonction pour générer l'AppBarTheme
+// AppBar Theme
 AppBarTheme _buildAppBarTheme(Color color) {
   return AppBarTheme(
     backgroundColor: color,
-    elevation: 2,
+    foregroundColor: Colors.white,
+    elevation: 3,
     iconTheme: IconThemeData(color: Colors.white),
     titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+  );
+}
+
+// Card Theme
+CardTheme _buildCardTheme() {
+  return CardTheme(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    margin: EdgeInsets.all(12),
+    clipBehavior: Clip.antiAlias,
   );
 }

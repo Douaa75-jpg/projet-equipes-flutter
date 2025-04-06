@@ -25,6 +25,27 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
   final _formKey = GlobalKey<FormState>();
 
+  // Fonction de validation de l'email
+  String? validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez entrer votre email';
+    }
+    // Vérification du format de l'email
+    final emailRegExp = RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+    if (!emailRegExp.hasMatch(value)) {
+      return 'Veuillez entrer un email valide';
+    }
+    return null;
+  }
+
+  // Fonction de validation du mot de passe
+  String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez entrer votre mot de passe';
+    }
+    return null;
+  }
+
   Future<void> login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -93,8 +114,19 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+
+      // Vérification de l'erreur pour un mot de passe ou un email incorrect
+      String errorMessage = e.toString();
+      
+      // Afficher un message d'erreur plus spécifique pour email ou mot de passe incorrect
+      if (errorMessage.contains("invalid email") || errorMessage.contains("invalid password")) {
+        errorMessage = "Email ou mot de passe incorrect.";
+      } else if (errorMessage.contains("Unauthorized")) {
+        errorMessage = "Échec de l'authentification. Veuillez vérifier vos informations.";
+      }
+
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
+          .showSnackBar(SnackBar(content: Text('Erreur: $errorMessage')));
     } finally {
       if (mounted) {
         setState(() {
@@ -103,12 +135,13 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Connexion'),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -116,21 +149,29 @@ class _LoginScreenState extends State<LoginScreen> {
           key: _formKey,
           child: Column(
             children: <Widget>[
+              // Champ Email avec une icône noire
               TextFormField(
                 controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer votre email';
-                  }
-                  return null;
-                },
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: TextStyle(color: Colors.black),
+                  prefixIcon: Icon(Icons.email, color: Colors.black),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black),
+                  ),
+                ),
+                validator: validateEmail,
               ),
+              const SizedBox(height: 16),
+              
+              // Champ Mot de passe avec icône noire et bouton visibilité
               TextFormField(
                 controller: passwordController,
                 obscureText: !_isPasswordVisible,
                 decoration: InputDecoration(
                   labelText: 'Mot de passe',
+                  labelStyle: TextStyle(color: Colors.black),
+                  prefixIcon: Icon(Icons.lock, color: Colors.black),
                   suffixIcon: IconButton(
                     icon: Icon(_isPasswordVisible
                         ? Icons.visibility
@@ -141,20 +182,45 @@ class _LoginScreenState extends State<LoginScreen> {
                       });
                     },
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.black),
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer votre mot de passe';
-                  }
-                  return null;
-                },
+                validator: validatePassword,
               ),
+              const SizedBox(height: 16),
+
+              // Lien mot de passe oublié avec couleur bleu
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    // Ajoutez la logique pour la récupération de mot de passe ici
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Fonctionnalité non implémentée"))
+                    );
+                  },
+                  child: const Text(
+                    'Mot de passe oublié ?',
+                    style: TextStyle(color: Colors.blue),
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 20),
+              
+              // Bouton de connexion avec effet de chargement
               ElevatedButton(
                 onPressed: isLoading ? null : login,
                 child: isLoading
                     ? const CircularProgressIndicator()
                     : const Text('Se connecter'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ],
           ),

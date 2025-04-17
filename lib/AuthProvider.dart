@@ -10,6 +10,10 @@ class AuthProvider with ChangeNotifier {
   String? _typeResponsable;
   String? _userId;
   String? _nom; // إضافة حقل الاسم
+  String? _prenom;
+  String? _email;
+  String? _matricule;
+  String? _datedenaissance;
   bool _isAuthenticated = false;
   final FlutterSecureStorage _storage = FlutterSecureStorage();
 
@@ -17,6 +21,10 @@ class AuthProvider with ChangeNotifier {
   String? get role => _role;
   String? get typeResponsable => _typeResponsable;
   String? get nom => _nom; // توفير الـ getter لاسم المستخدم
+  String? get prenom => _prenom;
+  String? get email => _email;
+  String? get matricule => _matricule;
+  String? get datedenaissance => _datedenaissance;
   bool get isAuthenticated => _isAuthenticated;
   String? get userId => _userId;
 
@@ -37,6 +45,10 @@ class AuthProvider with ChangeNotifier {
       _typeResponsable = responseData['user']['typeResponsable'];
       _userId = responseData['user']['id'];
       _nom = responseData['user']['nom']; // استخراج الاسم من الاستجابة
+      _prenom = responseData['user']['prenom'];
+      _email = responseData['user']['email'];
+      _matricule = responseData['user']['matricule'];
+      _datedenaissance = responseData['user']['datedenaissance'];
       _isAuthenticated = true;
 
       // Store token securely
@@ -56,7 +68,11 @@ class AuthProvider with ChangeNotifier {
     _role = null;
     _typeResponsable = null;
     _userId = null;
-    _nom = null; // إلغاء تخزين الاسم عند تسجيل الخروج
+    _nom = null; 
+    _prenom = null;
+    _email = null;
+    _matricule = null;
+    _datedenaissance = null;
     _isAuthenticated = false;
 
     // Remove token from secure storage
@@ -79,15 +95,22 @@ class AuthProvider with ChangeNotifier {
     _role = decodedToken['role'];
     _typeResponsable = decodedToken['typeResponsable'];
     _nom = decodedToken['nom']; // استخراج الاسم من الـ JWT
-
+    _prenom = decodedToken['prenom'];
+    _email = decodedToken['email'];
+    _matricule = decodedToken['matricule'];
+    _datedenaissance = decodedToken['datedenaissance'];
     notifyListeners();
 
-    return {
-      'id': _userId,
-      'email': decodedToken['email'],
-      'role': _role,
-      'typeResponsable': _typeResponsable,
-      'nom': _nom, // إضافة الاسم للـ response
-    };
+      return {
+    'id': _userId,
+    'email': _email,
+    'role': _role,
+    'typeResponsable': _typeResponsable,
+    'nom': _nom,
+    'prenom': _prenom,
+    'matricule': _matricule,
+    'datedenaissance': _datedenaissance,
+  };
+
   }
 }

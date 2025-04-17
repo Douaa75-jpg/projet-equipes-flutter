@@ -18,7 +18,9 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
   List<Employe> _employees = [];
   List<Responsable> _responsables = [];
   final RhService rhService = RhService();
-  final NotificationService _notificationService = NotificationService(); // NotificationService instance
+  final NotificationService _notificationService =
+      NotificationService(); // NotificationService instance
+  
   Widget _currentScreen = Center(
     child: Text(
       'Bienvenue dans l\'interface de ressource humain',
@@ -32,14 +34,27 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     _getCounts();
     _fetchEmployees();
     _fetchResponsables();
-    
+    _checkUserRole(); // Vérifier le rôle de l'utilisateur
     // Connect to the notification service with user ID
     _connectToNotificationService();
   }
 
+  // Fonction pour vérifier le rôle de l'utilisateur
+  void _checkUserRole() async {
+    final userData =
+        await Provider.of<AuthProvider>(context, listen: false).getUserData();
+    if (userData != null &&
+        userData['role'] == 'RESPONSABLE' &&
+        userData['typeResponsable'] == 'RH') {
+      
+    }
+  }
+
   // Function to connect to Notification Service
   void _connectToNotificationService() {
-    Provider.of<AuthProvider>(context, listen: false).getUserData().then((userData) {
+    Provider.of<AuthProvider>(context, listen: false)
+        .getUserData()
+        .then((userData) {
       if (userData != null && userData['id'] != null) {
         String userId = userData['id'].toString();
         _notificationService.connect(userId, _handleNotification);
@@ -100,7 +115,8 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
   // Disconnect notification service when disposing
   @override
   void dispose() {
-    _notificationService.disconnect();  // Disconnect from notification service when widget is disposed
+    _notificationService
+        .disconnect(); // Disconnect from notification service when widget is disposed
     super.dispose();
   }
 
@@ -119,8 +135,10 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatCard('Employés', totalEmployes, FontAwesomeIcons.user),
-                _buildStatCard('Responsables', totalResponsables, FontAwesomeIcons.userTie),
+                _buildStatCard(
+                    'Employés', totalEmployes, FontAwesomeIcons.user),
+                _buildStatCard('Responsables', totalResponsables,
+                    FontAwesomeIcons.userTie),
               ],
             ),
             SizedBox(height: 16),
@@ -155,14 +173,17 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
         children: [
           _buildUserHeader(),
           _buildDrawerItem('Gestion des congés', Icons.date_range, () {
-            setState(() => _currentScreen = Center(child: Text('إدارة الكونجي هنا')));
+            setState(() =>
+                _currentScreen = Center(child: Text('???')));
             Navigator.pop(context);
           }),
-          _buildDrawerItem('Afficher les données des employés', Icons.people, () {
+          _buildDrawerItem('Afficher les données des employés', Icons.people,
+              () {
             setState(() => _currentScreen = _buildEmployeesList());
             Navigator.pop(context);
           }),
-          _buildDrawerItem('Afficher les données des chefs d\'équipe', Icons.supervisor_account, () {
+          _buildDrawerItem('Afficher les données des chefs d\'équipe',
+              Icons.supervisor_account, () {
             setState(() => _currentScreen = _buildResponsablesList());
             Navigator.pop(context);
           }),
@@ -177,7 +198,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
 
   // Build user header in the drawer
   Widget _buildUserHeader() {
-    return FutureBuilder<Map<String, dynamic>?>( 
+    return FutureBuilder<Map<String, dynamic>?>(
       future: Provider.of<AuthProvider>(context, listen: false).getUserData(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -202,11 +223,13 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           String userName = snapshot.data?['nom'] ?? 'Nom non disponible';
           String userEmail = snapshot.data?['email'] ?? 'Email non disponible';
           return UserAccountsDrawerHeader(
-            accountName: Text(userName, style: TextStyle(fontWeight: FontWeight.bold)),
+            accountName:
+                Text(userName, style: TextStyle(fontWeight: FontWeight.bold)),
             accountEmail: Text(userEmail),
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
-              child: Icon(Icons.person, size: 40, color: const Color.fromARGB(255, 0, 0, 0)),
+              child: Icon(Icons.person,
+                  size: 40, color: const Color.fromARGB(255, 0, 0, 0)),
             ),
           );
         }
@@ -218,7 +241,8 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
   Widget _buildDrawerItem(String title, IconData icon, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: const Color.fromARGB(255, 0, 0, 0)),
-      title: Text(title, style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0))),
+      title: Text(title,
+          style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0))),
       onTap: onTap,
     );
   }
@@ -237,19 +261,26 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
             SizedBox(height: 8),
             Text(
               title,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 0, 0, 0)),
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: const Color.fromARGB(255, 0, 0, 0)),
             ),
             Text(
               '$count',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent),
             ),
           ],
         ),
       ),
     );
   }
+  
 
-  // Employees list
+// Liste des employés
   Widget _buildEmployeesList() {
     if (_employees.isEmpty) {
       return Center(child: CircularProgressIndicator());
@@ -263,7 +294,8 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           margin: EdgeInsets.symmetric(vertical: 8.0),
           child: ListTile(
             leading: CircleAvatar(
-              child: Text(employe.nom.substring(0, 1)), // Initiales de l'employé
+              child:
+                  Text(employe.nom.substring(0, 1)), // Initiales de l'employé
             ),
             title: Text('${employe.nom} ${employe.prenom}'),
             subtitle: Text(
@@ -275,7 +307,11 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
-  // Responsables list with expandable items
+
+
+
+
+  // Liste des responsables
   Widget _buildResponsablesList() {
     if (_responsables.isEmpty) {
       return Center(child: CircularProgressIndicator());
@@ -286,16 +322,22 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
         final responsable = _responsables[index];
         final responsablesEmployes = _employees
             .where((employe) =>
-                employe.responsable.nom == responsable.nom && employe.responsable.prenom == responsable.prenom)
+                employe.responsable.nom == responsable.nom &&
+                employe.responsable.prenom == responsable.prenom)
             .toList();
         return ExpansionTile(
-          title: Text('${responsable.nom} ${responsable.prenom}', style: TextStyle(fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 0, 0, 0))),
-          subtitle: Text('Email: ${responsable.email}', style: TextStyle(color: Colors.grey)),
+          title: Text('${responsable.nom} ${responsable.prenom}',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: const Color.fromARGB(255, 0, 0, 0))),
+          subtitle: Text('Email: ${responsable.email}',
+              style: TextStyle(color: Colors.grey)),
           children: [
             if (responsablesEmployes.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Text('Aucun employé dans cette équipe.', style: TextStyle(color: Colors.red)),
+                child: Text('Aucun employé dans cette équipe.',
+                    style: TextStyle(color: Colors.red)),
               ),
             ...responsablesEmployes.map((employe) {
               return ListTile(

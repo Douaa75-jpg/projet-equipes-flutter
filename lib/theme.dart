@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Couleurs inspirées du logo ZETABOX
-  static const Color primary = Color(0xFFB71C1C); // Rouge foncé
+  static const Color primary = Color(0xFFB31A1A); // Rouge foncé
   static const Color secondary = Color(0xFF880E4F); // Bordeaux
   static const Color accent = Color(0xFFE53935); // Rouge clair pour boutons
   static const Color surfaceLight = Color(0xFFF5F5F5); // Fond clair

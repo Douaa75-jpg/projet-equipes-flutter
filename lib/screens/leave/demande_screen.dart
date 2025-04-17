@@ -95,6 +95,13 @@ class _DemandeScreenState extends State<DemandeScreen> {
       return;
     }
 
+    if (_dateDebut!.isBefore(DateTime.now())) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("⏰ La date de début doit être dans le futur")),
+    );
+    return;
+  }
+
     if (_dateFin != null && _dateFin!.isBefore(_dateDebut!)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("La date de fin doit être après la date de début")),

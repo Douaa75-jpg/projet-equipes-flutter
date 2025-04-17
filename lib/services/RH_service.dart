@@ -55,7 +55,64 @@ class RhService {
       throw Exception('Échec de récupération des employés');
     }
   }
+
+   // Méthode pour mettre à jour un employé
+  Future<Map<String, dynamic>> updateEmployee(String id, Map<String, dynamic> updateData) async {
+    final url = Uri.parse('$baseUrlEmployes/$id');
+    final response = await http.put(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(updateData),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur lors de la mise à jour de l\'employé');
+    }
+  }
+
+  // Méthode pour supprimer un employé
+  Future<Map<String, dynamic>> deleteEmployee(String id) async {
+    final url = Uri.parse('$baseUrlEmployes/$id');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur lors de la suppression de l\'employé');
+    }
+  }
+
+  // Méthode pour mettre à jour un responsable
+  Future<Map<String, dynamic>> updateResponsable(String id, Map<String, dynamic> updateData) async {
+    final url = Uri.parse('$baseUrlResponsables/$id');
+    final response = await http.put(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(updateData),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur lors de la mise à jour du responsable');
+    }
+  }
+
+  // Méthode pour supprimer un responsable
+  Future<Map<String, dynamic>> deleteResponsable(String id) async {
+    final url = Uri.parse('$baseUrlResponsables/$id');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur lors de la suppression du responsable');
+    }
+  }
 }
+
 
 // Définition de la classe Responsable
 class Responsable {

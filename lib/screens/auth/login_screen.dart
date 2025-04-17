@@ -5,8 +5,8 @@ import '../dashboard/rh_dashboard_screen.dart';
 import '../dashboard/employee_dashboard_screen.dart';
 import '../dashboard/chef_equipe_dashboard_screen.dart';
 import '../dashboard/admin_dashboard_screen.dart';
-import '../../theme.dart'; // Import du thème
 import '../../AuthProvider.dart'; // Import d'AuthProvider
+import 'package:gestion_equipe_flutter/screens/auth/registre_screen.dart';
 
 enum TypeResponsable { chefEquipe, rh }
 
@@ -24,6 +24,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
   bool _isPasswordVisible = false;
   final _formKey = GlobalKey<FormState>();
+
+ late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   // Fonction de validation de l'email
   String? validateEmail(String? value) {
@@ -136,93 +140,135 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    bool obscure = false,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.black54),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 2),
+        ),
+        suffixIcon: suffixIcon,
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          // === LOGO ===
+          Image.asset(
+            'assets/logo.png',
+            height: 100,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Bienvenue',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F)),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Connectez-vous à votre compte',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 32),
+
+          _buildTextField(
+            label: 'Email',
+            controller: emailController,
+            validator: validateEmail,
+          ),
+          const SizedBox(height: 20),
+          _buildTextField(
+            label: 'Mot de passe',
+            controller: passwordController,
+            obscure: !_isPasswordVisible,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                color: Colors.grey,
+              ),
+              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+            ),
+            validator: validatePassword,
+          ),
+
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Fonctionnalité non implémentée')),
+                );
+              },
+              child: const Text('Mot de passe oublié ?',
+                  style: TextStyle(color: Color(0xFFD32F2F))),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: isLoading ? null : login,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: const Color(0xFFD32F2F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              elevation: 4,
+            ),
+            child: isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Se connecter', style: TextStyle(fontSize: 18, color: Colors.white)),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterPage()));
+            },
+            child: const Text(
+              "Vous n'avez pas de compte ? Créer un compte",
+              style: TextStyle(color: Color(0xFFD32F2F)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connexion'),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: <Widget>[
-              // Champ Email avec une icône noire
-              TextFormField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  labelStyle: TextStyle(color: Colors.black),
-                  prefixIcon: Icon(Icons.email, color: Colors.black),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black),
-                  ),
-                ),
-                validator: validateEmail,
+      backgroundColor: const Color.fromARGB(255, 249, 239, 241),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 8,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: isMobile ? 400 : 500),
+                child: _buildForm(context),
               ),
-              const SizedBox(height: 16),
-              
-              // Champ Mot de passe avec icône noire et bouton visibilité
-              TextFormField(
-                controller: passwordController,
-                obscureText: !_isPasswordVisible,
-                decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                  labelStyle: TextStyle(color: Colors.black),
-                  prefixIcon: Icon(Icons.lock, color: Colors.black),
-                  suffixIcon: IconButton(
-                    icon: Icon(_isPasswordVisible
-                        ? Icons.visibility
-                        : Icons.visibility_off),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black),
-                  ),
-                ),
-                validator: validatePassword,
-              ),
-              const SizedBox(height: 16),
-
-              // Lien mot de passe oublié avec couleur bleu
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    // Ajoutez la logique pour la récupération de mot de passe ici
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Fonctionnalité non implémentée"))
-                    );
-                  },
-                  child: const Text(
-                    'Mot de passe oublié ?',
-                    style: TextStyle(color: Colors.blue),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              
-              // Bouton de connexion avec effet de chargement
-              ElevatedButton(
-                onPressed: isLoading ? null : login,
-                child: isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Se connecter'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

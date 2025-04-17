@@ -53,29 +53,6 @@ class PointageService {
       throw Exception('Erreur lors de l\'enregistrement de l\'heure de départ: $e');
     }
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   Future<Map<String, dynamic>> calculerHeuresTravail(String employeId, String dateDebut, String dateFin) async {
     final response = await http.get(Uri.parse('$baseUrl/calcul-heures?employeId=$employeId&dateDebut=$dateDebut&dateFin=$dateFin'));
     print('Réponse API calculerHeuresTravail : ${response.body}');
@@ -101,7 +78,9 @@ Future<int> getNombreAbsences(String employeId) async {
   final response = await http.get(Uri.parse('$baseUrl/absences/$employeId'));
 
   if (response.statusCode == 200) {
-    return json.decode(response.body)['nombreAbsences'];
+      final absencesData = json.decode(response.body);
+      return absencesData['absences']; 
+      
   } else {
     throw Exception('Erreur lors de la récupération des absences');
   }

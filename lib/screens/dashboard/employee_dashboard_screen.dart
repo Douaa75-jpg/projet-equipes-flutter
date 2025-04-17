@@ -1,501 +1,748 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../../AuthProvider.dart';
+import 'package:intl/intl.dart';
 import '../../services/pointage_service.dart';
 import '../leave/demande_screen.dart';
-import '../../services/notification_service.dart';
 import '../tache_screen.dart';
 
 class EmployeeDashboard extends StatefulWidget {
+  const EmployeeDashboard({super.key});
+
   @override
   _EmployeeDashboardState createState() => _EmployeeDashboardState();
 }
 
 class _EmployeeDashboardState extends State<EmployeeDashboard> {
-  final PointageService _pointageService = PointageService();
-  final NotificationService _notificationService = NotificationService();
-
-  Map<String, dynamic>? _pointage;
-  List<dynamic> _historique = [];
-  bool _isLoading = true;
-  String _statut = "Chargement...";
-  int _totalHeures = 0;
-  int _totalHeuresSup = 0;
-
-  List<String> _notifications = [];
+  late String statut;
+  List<Map<String, dynamic>> historique = [];
+  int heuresTravail = 0;
+  int heuresSupp = 0;
+  int nombreAbsences = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadPointage();
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.userId != null) {
-      _notificationService.connect(authProvider.userId!, (message) {
-        setState(() {
-          _notifications.add(message);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      });
-    }
+    statut = 'ABSENT';
+    _verifierStatutActuel();
+    _fetchHistorique();
   }
 
-  @override
-  void dispose() {
-    _notificationService.disconnect();
-    super.dispose();
-  }
-
-  Future<void> _loadPointage() async {
+  void _fetchHistorique() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final pointageService = PointageService();
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.userId == null) throw Exception("Utilisateur non authentifié");
-
-      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      var pointage = await _pointageService.getPointage(authProvider.userId!, today);
-      var historique = await _pointageService.getHistorique(authProvider.userId!) ?? [];
-      var result = await _pointageService.calculerHeuresTravail(authProvider.userId!, today, today);
-
+      final historiqueData = await pointageService.getHistorique(auth.userId!);
       setState(() {
-        _pointage = pointage;
-        _statut = pointage['statut'] ?? "ABSENT";
-        _historique = historique;
-        _totalHeures = result['totalHeures'] ?? 0;
-        _totalHeuresSup = result['totalHeuresSup'] ?? 0;
-        _isLoading = false;
+        historique = List<Map<String, dynamic>>.from(historiqueData);
       });
+
+      // ✅ Appelle le calcul juste après avoir mis à jour historique
+      _calculerHeures();
     } catch (e) {
-      print("Erreur lors du chargement du pointage : $e");
-      setState(() {
-        _statut = "Erreur de chargement";
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      print('Erreur lors de la récupération de l\'historique : $e');
     }
   }
 
-  Future<void> _pointerArrivee() async {
+  void _verifierStatutActuel() async {
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.userId == null) throw Exception("Utilisateur non authentifié");
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final pointageService = PointageService();
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      DateTime now = DateTime.now().toUtc();  // Convertir à l'heure UTC
-      String heureArrivee = now.toIso8601String();
-      String today = now.toIso8601String();
+      final pointage = await pointageService.getPointage(auth.userId!, today);
 
-      DateTime limitTime = DateTime(now.year, now.month, now.day, 10, 0);
-      if (now.isAfter(limitTime)) {
-        throw Exception("Le pointage est interdit après 10h00.");
-      }
+      debugPrint('Réponse du pointage: $pointage');
 
-      await _pointageService.enregistrerPointage({
-        "employeId": authProvider.userId!,
-        "date": today,
-        "heureArrivee": heureArrivee,
-      });
-
-      _loadPointage();
-    } catch (e) {
-      String messageErreur = e.toString();
-      if (messageErreur.contains("Le pointage est interdit après 10h00.")) {
-        messageErreur = "Le pointage est interdit après 10h00.";
-      } else if (messageErreur.contains("a déjà pointé")) {
-        messageErreur = "a déjà pointé ce jour.";
-      } else if (messageErreur.contains("Échec de l’enregistrement du pointage")) {
-        messageErreur = "Échec de l’enregistrement du pointage";
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(messageErreur),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
-        ),
-      );
+      // Si aucun pointage trouvé pour aujourd'hui ou pointage vide
+      if (pointage == null || pointage.isEmpty) {
+      setState(() => statut = 'ABSENT');
+      return;
     }
-  }
 
-  Future<void> _pointerDepart() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.userId == null) throw Exception("Utilisateur non authentifié");
+      // Vérifier si l'employé a pointé aujourd'hui
+      final hasPointedToday = pointage['heureArrivee'] != null &&
+          DateTime.parse(pointage['heureArrivee']).day == DateTime.now().day;
 
-      String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      String heureDepart = DateTime.now().toUtc().toIso8601String();
-
-      var pointageArrivee = await _pointageService.getPointage(authProvider.userId!, today);
-      if (pointageArrivee == null ||  (pointageArrivee['statut'] != "PRÉSENT" && pointageArrivee['statut'] != "RETARD")){
-        throw Exception("Vous devez pointer l'arrivée avant de pointer le départ.");
-      }
-
-      await _pointageService.enregistrerHeureDepart(authProvider.userId!, today, heureDepart);
-      _loadPointage();
-
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 10),
-              Text("Succès", style: TextStyle(color: Colors.green)),
-            ],
-          ),
-          content: Text(
-            "Heure de départ enregistrée avec succès.",
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              child: Text("OK", style: TextStyle(color: Colors.green)),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      String messageErreur = e.toString();
-      if (messageErreur.contains("départ ne peut pas être avant")) {
-        messageErreur = "Vous ne pouvez pas pointer le départ avant 8h du matin.";
-      } else if (messageErreur.contains("Pointage non trouvé")) {
-        messageErreur = "Vous devez pointer l'arrivée avant de pointer le départ.";
-      }
-
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Icon(Icons.error_outline, color: Colors.red),
-              SizedBox(width: 10),
-              Text("Erreur", style: TextStyle(color: Colors.red)),
-            ],
-          ),
-          content: Text(
-            messageErreur,
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              child: Text("Fermer", style: TextStyle(color: Colors.red)),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      );
+      if (!hasPointedToday) {
+      setState(() => statut = 'ABSENT');
+      return;
     }
-  }
 
-  void _showNotificationsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Notifications'),
-          content: _notifications.isNotEmpty
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _notifications
-                      .map((notification) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Text(notification),
-                          ))
-                      .toList(),
-                )
-              : Text("Aucune notification reçue"),
-           actions: [
-            if (_notifications.isNotEmpty)
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _notifications.clear();
-                  });
-                  Navigator.of(context).pop();
-                },
-                child: Text('Vider'),
-              ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Fermer'),
-            ),
-          ],
-        );
-      },
-    );
+      // Priorité au statut du pointage actuel plutôt qu'à l'historique
+    final statutServeur = pointage['statut'].toString().toUpperCase();
+    
+       if (statutServeur == 'PRESENT' || statutServeur == 'RETARD') {
+      setState(() => statut = statutServeur);
+    } else {
+      // Déterminer le statut basé sur l'heure d'arrivée si le statut est invalide
+      final heureArrivee = DateTime.parse(pointage['heureArrivee']);
+      final heureLimite = DateTime(heureArrivee.year, heureArrivee.month, heureArrivee.day, 8, 15);
+      setState(() => statut = heureArrivee.isAfter(heureLimite) ? 'RETARD' : 'PRESENT');
+    }
+  } catch (e) {
+    debugPrint('Erreur lors de la vérification du statut: $e');
+    setState(() => statut = 'ABSENT');
   }
+}
 
-  void _showErrorDialog(Exception e) {
-    String messageErreur = e.toString();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red),
-            SizedBox(width: 10),
-            Text("Erreur", style: TextStyle(color: Colors.red)),
-          ],
-        ),
-        content: Text(messageErreur, style: TextStyle(fontSize: 16)),
-        actions: [
-          TextButton(
-            child: Text("Fermer", style: TextStyle(color: Colors.red)),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
+  // Calcul des heures de travail, heures supplémentaires et absences
+  void _calculerHeures() {
+    int totalHeures = 0;
+    int totalHeuresSupp = 0;
+    int totalAbsences = 0;
 
-  void _showSuccessDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 10),
-            Text("Succès", style: TextStyle(color: Colors.green)),
-          ],
-        ),
-        content: Text(message, style: TextStyle(fontSize: 16)),
-        actions: [
-          TextButton(
-            child: Text("OK", style: TextStyle(color: Colors.green)),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
+    for (var entry in historique.where((e) => e['deletedAt'] == null)) {
+      final date = DateTime.parse(entry['date']);
+      final isToday = date.day == DateTime.now().day && 
+                   date.month == DateTime.now().month && 
+                   date.year == DateTime.now().year;
+
+    // Ne pas compter aujourd'hui comme absence si l'employé n'a pas encore pointé
+    if (isToday && this.statut == 'ABSENT') continue;
+
+      // Caster les valeurs à int si elles sont de type num
+      final heures = (entry['heures'] ?? 0) as int;
+      final heuresSupp = (entry['heures_supp'] ?? 0) as int;
+      final statut = entry['statut'];
+
+      totalHeures += heures;
+      totalHeuresSupp += heuresSupp;
+
+      if (statut == 'ABSENT') {
+        totalAbsences++;
+      }
+    }
+
+    debugPrint('Absences calculées depuis l\'historique: $totalAbsences'); // Vérifie si ce nombre est correct
+
+    setState(() {
+      heuresTravail = totalHeures;
+      heuresSupp = totalHeuresSupp;
+      nombreAbsences = totalAbsences;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final theme = Theme.of(context);
+    final auth = Provider.of<AuthProvider>(context);
+    final nomComplet =
+        '${auth.nom ?? ''} ${auth.prenom ?? ''}'.trim() ?? 'Employé';
+    final email = auth.email ?? 'Non disponible';
+    final matricule = auth.matricule ?? 'Non disponible';
+    final dateNaissance = auth.datedenaissance != null
+        ? DateFormat('dd/MM/yyyy').format(DateTime.parse(auth.datedenaissance!))
+        : 'Non disponible';
 
-    if (authProvider.userId == null) {
-      return Scaffold(
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-            child: Text("Se connecter"),
-          ),
-        ),
-      );
-    }
-
-     // Icônes et couleurs associées aux statuts
-    IconData statutIcon;
-    Color statutColor;
-    String statutText;
-
-    switch (_statut) {
-      case 'PRÉSENT':
-        statutIcon = Icons.check_circle;  // Icône pour présent
-        statutColor = Colors.green;
-        statutText = 'Présent';
-        break;
-      case 'RETARD':
-        statutIcon = Icons.access_time;  // Icône pour retard
-        statutColor = Colors.orange;
-        statutText = 'Retard';
-        break;
-      case 'ABSENT':
-        statutIcon = Icons.cancel;  // Icône pour absent
-        statutColor = Colors.red;
-        statutText = 'Absent';
-        break;
-      default:
-        statutIcon = Icons.help;  // Icône par défaut
-        statutColor = Colors.grey;
-        statutText = 'Statut inconnu';
-        break;
-    }
-
-        return Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: Text('Bonjour, ${authProvider.nom ?? "Utilisateur"}'),
+        backgroundColor: theme.colorScheme.primary,
+        elevation: 4,
+        title: Text('Bienvenue $nomComplet',
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            )),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: Icon(Icons.notifications),
-                onPressed: () {
-                  _showNotificationsDialog(context);
-                },
-              ),
-              if (_notifications.isNotEmpty)
-                Positioned(
-                  right: 11,
-                  top: 11,
-                  child: Container(
-                    padding: EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    constraints: BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                       child: Text(
-                      '${_notifications.length}',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: Icon(Icons.exit_to_app, color: Colors.white),
+            onPressed: () async {
+              await auth.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+            },
           ),
         ],
       ),
-       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+      drawer: _buildDrawer(context, auth),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: const Color.fromARGB(255, 141, 8, 8)),
-              child: Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+            // 🔷 Statut Card
+            _buildStatusCard(statut),
+            SizedBox(height: 20),
+
+            // 🔷 4 Info Cards
+            _buildInfoCardsRow(),
+            SizedBox(height: 20),
+
+            // 🔷 Infos & Boutons de pointage
+            _buildProfileAndActionsSection(
+                context, auth, nomComplet, email, dateNaissance, matricule),
+            SizedBox(height: 20),
+
+            // 🔷 Historique
+            _buildHistorySection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context, AuthProvider authProvider) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration:
+                BoxDecoration(color: const Color.fromARGB(255, 141, 8, 8)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white,
+                  child: Icon(Icons.person, size: 40, color: Colors.red),
+                ),
+                SizedBox(height: 10),
+                Text('Menu Principal',
+                    style: TextStyle(color: Colors.white, fontSize: 20)),
+              ],
             ),
-            ListTile(
-              title: Text('Demande'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DemandeScreen(employeId: authProvider.userId!),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              title: Text('Tache'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TacheScreen(employeId: authProvider.userId!),
-                  ),
-                );
-              },
+          ),
+          ListTile(
+            leading: Icon(Icons.home, color: Colors.red),
+            title: Text('Tableau de bord'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.note_add, color: Colors.red),
+            title: Text('Demandes'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      DemandeScreen(employeId: authProvider.userId!),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.assignment, color: Colors.red),
+            title: Text('Tâches'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      TacheScreen(employeId: authProvider.userId!),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.assignment, color: Colors.red),
+            title: Text('Historique des demandes'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      TacheScreen(employeId: authProvider.userId!),
+                ),
+              );
+            },
+          ),
+          Divider(),
+          ListTile(
+            leading: Icon(Icons.settings, color: Colors.grey),
+            title: Text('Paramètres'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.help, color: Colors.grey),
+            title: Text('Aide'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusCard(String status) {
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (status) {
+      case 'PRESENT':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'RETARD':
+        statusColor = Colors.orange;
+        statusIcon = Icons.warning;
+        break;
+      default:
+        statusColor = Colors.red;
+        statusIcon = Icons.error;
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(statusIcon, color: statusColor, size: 30),
+            SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Statut actuel',
+                    style:
+                        TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                SizedBox(height: 4),
+                Text(status,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    )),
+              ],
             ),
           ],
         ),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: EdgeInsets.all(16.0),
+    );
+  }
+
+  void _loadAbsences(String employeId) async {
+    try {
+      final pointageService = PointageService();
+      final absences = await pointageService.getNombreAbsences(employeId);
+      debugPrint('Absences récupérées: $absences');
+      setState(() {
+        nombreAbsences = absences;
+      });
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération des absences: $e');
+    }
+  }
+
+  Widget _buildInfoCardsRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildInfoCard('Heures totales', '$heuresTravail h', Icons.access_time,
+            Colors.blue),
+        _buildInfoCard(
+            'Heures supp.', '$heuresSupp h', Icons.timer, Colors.orange),
+        _buildInfoCard(
+            'Absences', '$nombreAbsences', Icons.calendar_today, Colors.red),
+        _buildInfoCard('Solde congé', '6j', Icons.beach_access, Colors.teal),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard(
+      String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Card(
+        elevation: 2,
+        margin: EdgeInsets.symmetric(horizontal: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withAlpha((255 * 0.2).toInt()),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              SizedBox(height: 8),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600)),
+              SizedBox(height: 4),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAndActionsSection(BuildContext context, AuthProvider auth,
+      String nomComplet, String email, String dateNaissance, String matricule) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Profile Card
+        Expanded(
+          flex: 2,
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Tableau de bord de employé', style: TextStyle(fontSize: 24)),
-                  SizedBox(height: 20),
-                  Text("Statut: $_statut", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 20),
                   Row(
                     children: [
-                      Icon(statutIcon, color: statutColor, size: 30),
-                      SizedBox(width: 10),
-                      Text(
-                        statutText,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: statutColor),
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.blue.shade100,
+                        backgroundImage: AssetImage('assets/Normal .jpg'),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(nomComplet,
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                            SizedBox(height: 8),
+                            _buildProfileInfoRow(Icons.email, email),
+                            _buildProfileInfoRow(Icons.cake, dateNaissance),
+                            _buildProfileInfoRow(Icons.badge, matricule),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 20),
-                   Text("Heures de travail totales : $_totalHeures h", style: TextStyle(fontSize: 18)),
-                  Text("Heures supplémentaires : $_totalHeuresSup h", style: TextStyle(fontSize: 18)),
-                  SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: _statut == "ABSENT" ? _pointerArrivee : null,
-                    child: Text("Pointer l'arrivée"),
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: (_statut == "PRÉSENT" || _statut == "RETARD") ? _pointerDepart : null,
-                    child: Text("Enregistrer Heure de Départ"),
-                  ),
-                 
-                  SizedBox(height: 20),
-                  Text("Historique des pointages", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                 Expanded(
-                child: ListView.builder(
-                  itemCount: _historique.length,
-                  itemBuilder: (context, index) {
-                    var pointage = _historique[index];
-                    String statut = pointage['statut'] ?? 'Non défini';
-                    DateTime? date = pointage['date'] != null
-                        ? DateTime.tryParse(pointage['date'])
-                        : null;
-                    String formattedDate =
-                        date != null ? DateFormat('dd MMM yyyy').format(date) : 'Inconnue';
-
-                    IconData statutIcon;
-                    Color statutColor;
-                    
-                    switch (statut) {
-                      case 'PRÉSENT':
-                        statutIcon = Icons.check_circle;
-                        statutColor = Colors.green;
-                        break;
-                      case 'RETARD':
-                        statutIcon = Icons.access_time;
-                        statutColor = Colors.orange;
-                        break;
-                      case 'ABSENT':
-                        statutIcon = Icons.cancel;
-                        statutColor = Colors.red;
-                        break;
-                      default:
-                        statutIcon = Icons.help;
-                        statutColor = Colors.grey;
-                        break;
-                    }
-
-                    return Card(
-                      margin: EdgeInsets.symmetric(vertical: 8.0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                      elevation: 5,
-                      child: ListTile(
-                        contentPadding: EdgeInsets.all(16.0),
-                        leading: Icon(statutIcon, color: statutColor),
-                        title: Text(
-                          formattedDate,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                        ),
-                        subtitle: Text(
-                          "Statut: $statut",
-                          style: TextStyle(color: statutColor),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                ],
               ),
+            ),
+          ),
+        ),
+        SizedBox(width: 16),
 
-                              ],
-                            ),
-                          ),
-                  );
-                }
-              }
+        // Actions Card
+        Expanded(
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildActionButton(
+                      context: context,
+                      icon: Icons.login,
+                      label: "Pointer l'arrivée",
+                      color: Colors.green,
+                      onPressed: () async {
+                        try {
+                          final pointageService = PointageService();
+                          final now = DateTime.now();
+                          final today = DateFormat('yyyy-MM-dd').format(now);
+
+                          final existingPointage = await pointageService.getPointage(auth.userId!, today);
+                          
+
+                          if (existingPointage != null &&
+                              existingPointage['heureArrivee'] != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Vous avez déjà pointé aujourd\'hui')),
+                            );
+                            return;
+                          }
+
+                          final heureLimiteRetard =
+                              DateTime(now.year, now.month, now.day, 8, 15);
+                          final heureLimiteInterdite =
+                              DateTime(now.year, now.month, now.day, 10, 0);
+
+                          if (now.isAfter(heureLimiteInterdite)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text('Pointage impossible après 10h.')),
+                            );
+                            return;
+                          }
+
+                          final heureArrivee = now.toIso8601String();
+
+                          String newStatut = 'PRESENT';
+                          if (now.isAfter(heureLimiteRetard) &&
+                              now.isBefore(heureLimiteInterdite)) {
+                            newStatut = 'RETARD';
+                          }
+
+                          final data = {
+                            'employeId': auth.userId,
+                            'date': now.toIso8601String(),
+                            'heureArrivee': heureArrivee,
+                            'statut': newStatut,
+                          };
+
+                          await pointageService.enregistrerPointage(data);
+
+                          setState(() {
+                            statut = newStatut;
+                          });
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Pointage enregistré: $newStatut')),
+                          );
+                        } catch (e) {
+                          print('Erreur : $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erreur lors du pointage')),
+                          );
+                        }
+                      }),
+                  SizedBox(height: 12),
+                  _buildActionButton(
+                      context: context,
+                      icon: Icons.logout,
+                      label: "Départ",
+                      color: Colors.red,
+                      onPressed: () async {
+                        try {
+                          final pointageService = PointageService();
+                          final now = DateTime.now();
+                          final today = DateFormat('yyyy-MM-dd').format(now);
+
+                          // Vérifier si l'employé a déjà pointé aujourd'hui
+                          final existingPointage = await pointageService .getPointage(auth.userId!, today);
+                          print("Existing Pointage: $existingPointage");
+
+                          if (existingPointage['heureArrivee'] == null) {
+                            print("Heure d'arrivée est nulle.");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar( content: Text('Veuillez d\'abord enregistrer votre arrivée.')),
+                            );
+                            return;
+                          }
+
+                         
+                          // Vérifier que l'employé est présent ou en retard
+                          if (existingPointage['status'] != 'PRESENT' && existingPointage['status'] != 'RETARD') {
+                            print("L'employé n'est ni présent ni en retard.");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('L\'employé doit être présent ou en retard pour enregistrer l\'heure de départ.')),
+                            );
+                            return;
+                          }
+
+                          // Vérifier si l'heure de départ est déjà enregistrée
+                          if (existingPointage['heureDepart'] != null) {
+                            print("Départ déjà enregistré.");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar( content: Text('Vous avez déjà enregistré votre départ.')),
+                            );
+                            return;
+                          }
+                          // Enregistrer l'heure de départ
+                          await pointageService.enregistrerHeureDepart(
+                            auth.userId!,
+                            today,
+                            now.toIso8601String(),
+                          );
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Départ enregistré avec succès')),
+                          );
+                          // Mettre à jour l'historique des pointages
+                          _fetchHistorique();
+                        } catch (e) {
+                          print(
+                              'Erreur lors de l\'enregistrement du départ : $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Erreur lors de l\'enregistrement du départ')),
+                          );
+                        }
+                      }),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade600),
+          SizedBox(width: 8),
+          Flexible(
+            child: Text(text,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade800)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          padding: EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 2,
+        ),
+        onPressed: onPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white),
+            SizedBox(width: 8),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistorySection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.history, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Historique de pointage',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            Divider(height: 20, thickness: 1),
+            if (historique.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text('Aucun historique disponible',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              ...historique.map((pointage) {
+                final date = DateFormat('dd/MM/yyyy')
+                    .format(DateTime.parse(pointage['date']));
+                final heureArrivee = pointage['heureArrivee'] != null
+                    ? DateFormat('HH:mm')
+                        .format(DateTime.parse(pointage['heureArrivee']))
+                    : '-';
+                final heureDepart = pointage['heureDepart'] != null
+                    ? DateFormat('HH:mm')
+                        .format(DateTime.parse(pointage['heureDepart']))
+                    : '-';
+                final statut = pointage['statut'] ?? 'ABSENT';
+                return _buildHistoryItem(
+                    date, heureArrivee, heureDepart, statut);
+              }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryItem(
+      String date, String heureArrivee, String heureDepart, String statut) {
+    Color statusColor;
+    switch (statut) {
+      case 'PRESENT':
+        statusColor = Colors.green;
+        break;
+      case 'RETARD':
+        statusColor = Colors.orange;
+        break;
+      default:
+        statusColor = Colors.red;
+    }
+
+    return Container(
+      padding: EdgeInsets.all(12),
+      margin: EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: statusColor.withAlpha((255 * 0.1).toInt()),
+
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: statusColor.withAlpha((255 * 0.3).toInt())),
+
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(date,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Arrivée: $heureArrivee', style: TextStyle(fontSize: 14)),
+              Text('Départ: $heureDepart', style: TextStyle(fontSize: 14)),
+            ],
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withAlpha((255 * 0.2).toInt()),
+
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(statut,
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
+          ),
+        ],
+      ),
+    );
+  }
+}

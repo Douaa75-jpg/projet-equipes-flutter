@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../services/pointage_service.dart';
 import '../leave/demande_screen.dart';
 import '../tache_screen.dart';
+import '../leave/HistoriqueDemandesPage.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({super.key});
@@ -29,12 +30,15 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   }
 
   void _fetchHistorique() async {
+    debugPrint('Début de fetchHistorique');
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final pointageService = PointageService();
     try {
       final historiqueData = await pointageService.getHistorique(auth.userId!);
+       debugPrint('Données historiques reçues: ${historiqueData.length} entrées');
       setState(() {
         historique = List<Map<String, dynamic>>.from(historiqueData);
+        debugPrint('Historique mis à jour: ${historique.length} entrées');
       });
 
       // ✅ Appelle le calcul juste après avoir mis à jour historique
@@ -77,8 +81,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     } else {
       // Déterminer le statut basé sur l'heure d'arrivée si le statut est invalide
       final heureArrivee = DateTime.parse(pointage['heureArrivee']);
-      final heureLimite = DateTime(heureArrivee.year, heureArrivee.month, heureArrivee.day, 8, 15);
-      setState(() => statut = heureArrivee.isAfter(heureLimite) ? 'RETARD' : 'PRESENT');
+      
     }
   } catch (e) {
     debugPrint('Erreur lors de la vérification du statut: $e');
@@ -127,6 +130,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = Provider.of<AuthProvider>(context);
+    
     final nomComplet =
         '${auth.nom ?? ''} ${auth.prenom ?? ''}'.trim() ?? 'Employé';
     final email = auth.email ?? 'Non disponible';
@@ -136,7 +140,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         : 'Non disponible';
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: theme.colorScheme.primary,
         elevation: 4,
@@ -248,7 +252,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      TacheScreen(employeId: authProvider.userId!),
+                      HistoriqueDemandesPage(employeId: authProvider.userId!),
                 ),
               );
             },
@@ -472,28 +476,12 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                             );
                             return;
                           }
-
-                          final heureLimiteRetard =
-                              DateTime(now.year, now.month, now.day, 8, 15);
-                          final heureLimiteInterdite =
-                              DateTime(now.year, now.month, now.day, 10, 0);
-
-                          if (now.isAfter(heureLimiteInterdite)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content:
-                                      Text('Pointage impossible après 10h.')),
-                            );
-                            return;
-                          }
+                          
 
                           final heureArrivee = now.toIso8601String();
 
                           String newStatut = 'PRESENT';
-                          if (now.isAfter(heureLimiteRetard) &&
-                              now.isBefore(heureLimiteInterdite)) {
-                            newStatut = 'RETARD';
-                          }
+                          
 
                           final data = {
                             'employeId': auth.userId,
@@ -546,7 +534,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
 
                          
                           // Vérifier que l'employé est présent ou en retard
-                          if (existingPointage['status'] != 'PRESENT' && existingPointage['status'] != 'RETARD') {
+                         if (existingPointage['statut'] != 'PRESENT' && existingPointage['statut'] != 'RETARD') {
                             print("L'employé n'est ni présent ni en retard.");
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('L\'employé doit être présent ou en retard pour enregistrer l\'heure de départ.')),
@@ -572,7 +560,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Départ enregistré avec succès')),
                           );
-                          // Mettre à jour l'historique des pointages
+                           // Rafraîchir à la fois le statut et l'historique
+                          _verifierStatutActuel();
                           _fetchHistorique();
                         } catch (e) {
                           print(

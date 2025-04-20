@@ -74,17 +74,80 @@ class PointageService {
   }
 }
 
+//nombre d'absence 
 Future<int> getNombreAbsences(String employeId) async {
-  final response = await http.get(Uri.parse('$baseUrl/absences/$employeId'));
+  try {
+    final response = await http.get(Uri.parse('$baseUrl/absences/$employeId'));
 
-  if (response.statusCode == 200) {
-      final absencesData = json.decode(response.body);
-      return absencesData['absences']; 
+    if (response.statusCode == 200) {
+      final dynamic absencesData = json.decode(response.body);
       
-  } else {
-    throw Exception('Erreur lors de la récupération des absences');
+      // Cas 1: La réponse est directement un nombre (int)
+      if (absencesData is int) {
+        return absencesData;
+      }
+      
+      // Cas 2: La réponse est un Map avec une propriété 'absences'
+      if (absencesData is Map && absencesData.containsKey('absences')) {
+        return absencesData['absences'] as int? ?? 0;
+      }
+      
+      // Cas 3: La réponse est une liste (compter les éléments)
+      if (absencesData is List) {
+        return absencesData.length;
+      }
+      
+      // Si le format n'est pas reconnu
+      return 0;
+    } else {
+      // Pour les autres codes statut, retourner 0 avec un log
+      print('Statut HTTP ${response.statusCode} - ${response.body}');
+      return 0;
+    }
+  } catch (e) {
+    // Gestion des erreurs de réseau/parsing
+    print('Erreur dans getNombreAbsences: $e');
+    return 0;
   }
 }
 
+//getNombreEmployesPresentAujourdhu
+Future<int> getNombreEmployesPresentAujourdhui() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/stats/presences-aujourdhui'),
+    );
+    
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as int;
+    } else {
+      throw Exception('Erreur lors de la récupération des présences');
+    }
+  } catch (e) {
+    print('Erreur: $e');
+    return 0; // نرجع 0 في حالة الخطأ
+  }
+}
 
+// Récupérer le nombre d'absents aujourd'hui
+Future<int> getNombreEmployesAbsentAujourdhui() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/absences/aujourdhui'),
+    );
+    
+    print('Réponse API getNombreEmployesAbsentAujourdhui: ${response.body}');
+    
+     if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      // Extrait la valeur numérique du champ 'absences'
+      return data['absences'] as int;
+    } else {
+      throw Exception('Erreur lors de la récupération des absences: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Erreur dans getNombreEmployesAbsentAujourdhui: $e');
+    return 0; // Valeur par défaut en cas d'erreur
+  }
+}
 }

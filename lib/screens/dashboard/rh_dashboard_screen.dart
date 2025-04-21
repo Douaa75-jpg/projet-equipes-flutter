@@ -9,6 +9,7 @@ import 'dart:developer';
 import '../../services/notification_service.dart';
 import '../Notification_Screen.dart';
 import '../Listes/liste_employe.dart';
+import '../Listes/liste_chef.dart';
 
 class RHDashboardScreen extends StatefulWidget {
   RHDashboardScreen({super.key});
@@ -87,13 +88,19 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
               ],
             ),
           ),
-          _buildDrawerItem(context, Icons.dashboard, 'Tableau de bord', () {}),
+          _buildDrawerItem(context, Icons.dashboard, 'Tableau de bord', () {
+             setState(() => _currentScreen = RHDashboardScreen());
+            Navigator.pop(context);
+          }),
           _buildDrawerItem(context, Icons.people_alt, 'Liste Employees', () {
              setState(() => _currentScreen = ListeEmployeScreen());
             Navigator.pop(context);
           }),
           _buildDrawerItem(
-              context, Icons.supervisor_account, 'Liste Chef Equipe', () {}),
+              context, Icons.supervisor_account, 'Liste Chef Equipe', () {
+                setState(() => _currentScreen = ListeChefScreen());
+            Navigator.pop(context);
+              }),
           _buildDrawerItem(
               context, Icons.notifications_active, 'Notifications', () {
                  setState(() => _currentScreen = NotificationScreen());
@@ -163,7 +170,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildWelcomeHeader(authProvider),
+          _buildWelcomeHeader(authProvider, theme),
           const SizedBox(height: 24),
           _buildStatsGrid(context),
           const SizedBox(height: 32),
@@ -175,43 +182,102 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     );
   }
 
-  Widget _buildWelcomeHeader(AuthProvider authProvider) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Welcome back,',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${authProvider.prenom ?? ''} ${authProvider.nom ?? ''}',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Here\'s what\'s happening today',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
+  Widget _buildWelcomeHeader(AuthProvider authProvider, ThemeData theme) {
+  final isDarkMode = theme.brightness == Brightness.dark;
+  
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDarkMode ? Colors.blueGrey[800] : Colors.blue[50],
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
         ),
       ],
-    );
-  }
+    ),
+    child: Row(
+      children: [
+        // Partie gauche avec l'icône
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.blueGrey[700] : Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.person_outline,
+            size: 30,
+            color: isDarkMode ? Colors.white : Colors.blue[700],
+          ),
+        ),
+        const SizedBox(width: 16),
+        
+        // Partie droite avec le texte
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bienvenue,',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDarkMode ? Colors.white70 : Colors.blueGrey[600],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${authProvider.prenom ?? ''} ${authProvider.nom ?? ''}',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.blueGrey[800],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Voici votre tableau de bord RH',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.white60 : Colors.blueGrey[500],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Optionnel: Badge ou indicateur
+        if (authProvider.role != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.blue[600] : Colors.blue[700],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              authProvider.role!.toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
 
   Widget _buildStatsGrid(BuildContext context) {
-    // تحديد حجم الشاشة باستخدام MediaQuery
+    
     final screenWidth = MediaQuery.of(context).size.width;
     final rhService = RhService();
-    // تحديد عدد الأعمدة بناءً على حجم الشاشة
+    
     int crossAxisCount;
     double childAspectRatio;
 
@@ -228,7 +294,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
       crossAxisCount = 3;
       childAspectRatio = 2;
     } else {
-      // حواسيب مكتبية (عرض أكبر من 1200px)
+      
       crossAxisCount = 4;
       childAspectRatio = 2;
     }

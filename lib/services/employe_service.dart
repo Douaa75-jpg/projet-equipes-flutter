@@ -15,7 +15,49 @@ class EmployeService {
       throw Exception('Échec de récupération des employés');
     }
   }
+
+   // ✅ supprimer employe
+  Future<bool> deleteEmployee(String id) async {
+  final response = await http.delete(
+    Uri.parse('$baseUrl/$id'),
+    headers: {'Content-Type': 'application/json'},
+  );
+
+  if (response.statusCode == 200) {
+    return true;
+  } else if (response.statusCode == 404) {
+    throw Exception('Employé non trouvé');
+  } else if (response.statusCode == 500) {
+    throw Exception('Erreur interne du serveur');
+  } else {
+    throw Exception('Échec de la suppression de l\'employé: ${response.statusCode}');
+  }
 }
+ // ✅ Mettre à jour un employé
+  Future<Employe> updateEmployee(String id, Map<String, dynamic> updateData) async {
+     if (updateData['dateDeNaissance'] != null && updateData['dateDeNaissance'] is DateTime) {
+    updateData['dateDeNaissance'] = updateData['dateDeNaissance'].toIso8601String();
+    }
+    final response = await http.patch(
+      Uri.parse('$baseUrl/$id'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(updateData),
+    );
+
+    if (response.statusCode == 200) {
+      return Employe.fromJson(json.decode(response.body));
+    } else if (response.statusCode == 404) {
+      throw Exception('Employé non trouvé');
+    } else if (response.statusCode == 400) {
+      throw Exception('Données invalides: ${response.body}');
+    } else {
+      throw Exception('Échec de la mise à jour: ${response.statusCode}');
+    }
+  }
+}
+
 
 // Définition de la classe Employe
 class Employe {
@@ -39,7 +81,7 @@ class Employe {
 
   factory Employe.fromJson(Map<String, dynamic> json) {
     return Employe(
-      id: json['_id'] ?? '',
+       id: json['id'] ?? json['_id'] ?? '',
       nom: json['utilisateur']['nom'] ?? '',
       prenom: json['utilisateur']['prenom'] ?? '',
       email: json['utilisateur']['email'] ?? '',

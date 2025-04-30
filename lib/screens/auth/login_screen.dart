@@ -7,7 +7,7 @@ import '../dashboard/chef_equipe_dashboard_screen.dart';
 import '../dashboard/admin_dashboard_screen.dart';
 import '../../AuthProvider.dart'; // Import d'AuthProvider
 import 'package:gestion_equipe_flutter/screens/auth/registre_screen.dart';
-
+import '../accueil_employe.dart';
 enum TypeResponsable { chefEquipe, rh }
 
 class LoginScreen extends StatefulWidget {
@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-                builder: (context) =>  EmployeeDashboard()));
+                builder: (context) =>  AccueilEmploye()));
       } else if (role == 'RESPONSABLE') {
         // Vérification du sous-rôle uniquement pour les responsables
         if (subRole.isEmpty) {
@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => ChefEquipeDashboardScreen()));
+                      builder: (context) => ChefEquipeDashboard()));
               break;
             case TypeResponsable.rh:
               Navigator.pushReplacement(context,

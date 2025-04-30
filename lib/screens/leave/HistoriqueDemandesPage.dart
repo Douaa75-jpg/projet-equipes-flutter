@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/demande_service.dart';
+import '../employee_layout.dart'; // Import ajouté
+import '../../services/notification_service.dart';
 
 class HistoriqueDemandesPage extends StatefulWidget {
   final String employeId;
@@ -16,6 +18,7 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
   List<dynamic> filteredDemandes = [];
   bool isLoading = true;
   String selectedStatut = 'TOUS';
+  final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
@@ -55,13 +58,25 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
     return DateFormat('dd/MM/yyyy – HH:mm').format(date);
   }
 
+  Color getStatusColor(String statut) {
+    switch (statut) {
+      case 'APPROUVEE':
+        return Colors.green;
+      case 'REJETEE':
+        return Colors.red;
+      case 'EN_ATTENTE':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
   void _modifierDemandeDialog(Map<String, dynamic> demande) {
     final TextEditingController raisonController =
         TextEditingController(text: demande['raison'] ?? '');
     DateTime dateDebut = DateTime.parse(demande['dateDebut']);
     DateTime? dateFin =
         demande['dateFin'] != null ? DateTime.parse(demande['dateFin']) : null;
-        
 
     showDialog(
       context: context,
@@ -72,12 +87,16 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
             children: [
               TextFormField(
                 controller: raisonController,
-                decoration: const InputDecoration(labelText: 'Raison'),
+                decoration: const InputDecoration(
+                  labelText: 'Raison',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 10),
               ListTile(
                 title: const Text("Date début"),
                 subtitle: Text(DateFormat('dd/MM/yyyy').format(dateDebut)),
+                trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -89,12 +108,13 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
                 },
               ),
               ListTile(
-              title: const Text("Date fin"),
-              subtitle: Text(
-                dateFin != null
-                    ? DateFormat('dd/MM/yyyy').format(dateFin!)
-                    : 'Non définie',
-              ),
+                title: const Text("Date fin"),
+                subtitle: Text(
+                  dateFin != null
+                      ? DateFormat('dd/MM/yyyy').format(dateFin!)
+                      : 'Non définie',
+                ),
+                trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -114,6 +134,9 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
             child: const Text("Annuler"),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+            ),
             onPressed: () async {
               await DemandeService().updateDemande(demande['id'], {
                 'dateDebut': dateDebut.toIso8601String(),
@@ -125,7 +148,10 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
 
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Demande modifiée !")),
+                const SnackBar(
+                  content: Text("Demande modifiée !"),
+                  backgroundColor: Colors.green,
+                ),
               );
               fetchDemandes();
             },
@@ -138,63 +164,142 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Historique des demandes')),
-      body: isLoading
+    return EmployeeLayout(
+      title: 'Historique des Demandes',
+       notificationService: _notificationService,
+      child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: DropdownButton<String>(
-                    value: selectedStatut,
-                    onChanged: (value) {
-                      if (value != null) filterDemandes(value);
-                    },
-                    items: const [
-                      DropdownMenuItem(value: 'TOUS', child: Text('Toutes les demandes')),
-                      DropdownMenuItem(value: 'APPROUVEE', child: Text('Approuvées')),
-                      DropdownMenuItem(value: 'REJETEE', child: Text('Rejetées')),
-                      DropdownMenuItem(value: 'EN_ATTENTE', child: Text('En attente')),
-                    ],
+                  padding: const EdgeInsets.all(16.0),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 8.0),
+                      child: DropdownButton<String>(
+                        value: selectedStatut,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        onChanged: (value) {
+                          if (value != null) filterDemandes(value);
+                        },
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'TOUS',
+                            child: Text('Toutes les demandes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'APPROUVEE',
+                            child: Text('Approuvées'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'REJETEE',
+                            child: Text('Rejetées'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'EN_ATTENTE',
+                            child: Text('En attente'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 Expanded(
                   child: filteredDemandes.isEmpty
-                      ? const Center(child: Text('Aucune demande trouvée.'))
+                      ? const Center(
+                          child: Text(
+                            'Aucune demande trouvée.',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        )
                       : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
                           itemCount: filteredDemandes.length,
                           itemBuilder: (context, index) {
                             final demande = filteredDemandes[index];
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              elevation: 3,
+                              margin: const EdgeInsets.only(bottom: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                               child: Padding(
-                                padding: const EdgeInsets.all(8.0),
+                                padding: const EdgeInsets.all(16.0),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Icon(Icons.event_note, color: Colors.blue),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            demande['type'].toString().toUpperCase(),
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                        Text(
+                                          demande['type']
+                                              .toString()
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                        Chip(
+                                          backgroundColor:
+                                              getStatusColor(demande['statut'])
+                                                  .withOpacity(0.2),
+                                          label: Text(
+                                            demande['statut'],
+                                            style: TextStyle(
+                                              color:
+                                                  getStatusColor(demande['statut']),
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 5),
-                                    Text('Début : ${formatDate(demande['dateDebut'])}'),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today,
+                                            size: 16, color: Colors.grey),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Début: ${formatDate(demande['dateDebut'])}',
+                                          style:
+                                              const TextStyle(color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
                                     if (demande['dateFin'] != null)
-                                      Text('Fin : ${formatDate(demande['dateFin'])}'),
-                                    Text('Statut : ${demande['statut']}'),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today,
+                                                size: 16, color: Colors.grey),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Fin: ${formatDate(demande['dateFin'])}',
+                                              style: const TextStyle(
+                                                  color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     if (demande['raison'] != null &&
                                         demande['raison'].toString().isNotEmpty)
-                                      Text(
-                                        'Raison : ${demande['raison']}',
-                                        style: const TextStyle(fontStyle: FontStyle.italic),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: Text(
+                                          'Raison: ${demande['raison']}',
+                                          style: const TextStyle(
+                                              fontStyle: FontStyle.italic),
+                                        ),
                                       ),
                                     const SizedBox(height: 10),
                                     Row(
@@ -205,12 +310,15 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
                                             onPressed: () {
                                               _modifierDemandeDialog(demande);
                                             },
-                                            icon: const Icon(Icons.edit, color: Colors.orange),
+                                            icon: const Icon(Icons.edit,
+                                                color: Colors.orange),
                                             label: const Text(
                                               'Modifier',
-                                              style: TextStyle(color: Colors.orange),
+                                              style:
+                                                  TextStyle(color: Colors.orange),
                                             ),
                                           ),
+                                        const SizedBox(width: 10),
                                         TextButton.icon(
                                           onPressed: () async {
                                             final confirm = await showDialog<bool>(
@@ -222,12 +330,18 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
                                                 actions: [
                                                   TextButton(
                                                     onPressed: () =>
-                                                        Navigator.pop(context, false),
+                                                        Navigator.pop(
+                                                            context, false),
                                                     child: const Text('Annuler'),
                                                   ),
-                                                  TextButton(
+                                                  ElevatedButton(
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          const Color(0xFF8B0000),
+                                                    ),
                                                     onPressed: () =>
-                                                        Navigator.pop(context, true),
+                                                        Navigator.pop(
+                                                            context, true),
                                                     child: const Text('Supprimer'),
                                                   ),
                                                 ],
@@ -237,19 +351,23 @@ class _HistoriqueDemandesPageState extends State<HistoriqueDemandesPage> {
                                               try {
                                                 final service = DemandeService();
                                                 await service.supprimerDemande(
-                                                    demande['id'], widget.employeId);
+                                                    demande['id'],
+                                                    widget.employeId);
                                                 fetchDemandes();
                                               } catch (e) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
                                                   SnackBar(
                                                     content: Text(
                                                         'Erreur lors de la suppression : $e'),
+                                                    backgroundColor: Colors.red,
                                                   ),
                                                 );
                                               }
                                             }
                                           },
-                                          icon: const Icon(Icons.delete, color: Colors.red),
+                                          icon: const Icon(Icons.delete,
+                                              color: Colors.red),
                                           label: const Text(
                                             'Supprimer',
                                             style: TextStyle(color: Colors.red),

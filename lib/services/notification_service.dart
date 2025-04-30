@@ -1,55 +1,51 @@
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'dart:async';
+import 'package:flutter/material.dart';
 
 class NotificationService {
-  late IO.Socket _socket;
+  final StreamController<List<Map<String, dynamic>>> _notificationsController = 
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+  
+  List<Map<String, dynamic>> _notifications = [];
+  StreamSubscription? _subscription;
 
-  // Connexion à WebSocket avec l'ID de l'utilisateur
-  void connect(String userId, Function(String) onNotificationReceived) {
-    // Crée la connexion WebSocket en définissant les options nécessaires
-    _socket = IO.io(
-      'http://localhost:3000', // Remplacez par l'URL de votre serveur Socket.IO
-      IO.OptionBuilder()
-          .setTransports(['websocket']) // Utilise uniquement WebSocket
-          .disableAutoConnect() // Connexion manuelle
-          .setQuery({'userId': userId}) // Ajoute l'ID de l'utilisateur à la requête
-          .build(),
-    );
+  Stream<List<Map<String, dynamic>>> get notifications => _notificationsController.stream;
 
-    // Connexion au serveur
-    _socket.connect();
-
-    // Lorsque la connexion est établie
-    _socket.onConnect((_) {
-      print('✅ Employé connecté au WebSocket');
+  void addNotification(Map<String, dynamic> notification) {
+    _notifications.insert(0, {
+      ...notification,
+      'time': DateTime.now().toString(),
+      'read': false,
     });
+    _notificationsController.add([..._notifications]);
+  }
 
-    // Réception des notifications
-    _socket.on('notification', (data) {
-      print('🔔 Notification reçue : $data');
-      onNotificationReceived(data); // Appel du callback pour traiter la notification reçue
-    });
+  void markAsRead(int index) {
+    if (index >= 0 && index < _notifications.length) {
+      _notifications[index]['read'] = true;
+      _notificationsController.add([..._notifications]);
+    }
+  }
+  
 
-    // Gestion de la déconnexion
-    _socket.onDisconnect((_) {
-      print('❌ Déconnecté du WebSocket');
-    });
-
-    // Gestion des erreurs de connexion
-    _socket.onError((error) {
-      print('❌ Erreur WebSocket : $error');
+  void connect(String userId, void Function(String) onNotification) {
+    // Simulation de notifications - à remplacer par un vrai service
+    _subscription = Stream.periodic(const Duration(seconds: 30)).listen((_) {
+      final notification = {
+        'title': 'Nouvelle notification',
+        'message': 'Mise à jour du système - ${DateTime.now().hour}:${DateTime.now().minute}',
+      };
+      addNotification(notification);
+      onNotification(notification['message'] ?? 'Nouvelle notification'); // Correction ici
     });
   }
 
-  // Déconnexion du serveur WebSocket
   void disconnect() {
-    _socket.disconnect();
-    print('❌ Déconnecté du WebSocket');
+    _subscription?.cancel();
+    _subscription = null;
   }
 
-  // Envoi d'une notification via WebSocket
-  void sendNotification(String userId, String message) {
-    // Envoie un événement de notification avec l'ID de l'utilisateur et le message
-    _socket.emit('notification', {'userId': userId, 'message': message});
-    print('📤 Notification envoyée à $userId: $message');
+  void dispose() {
+    disconnect();
+    _notificationsController.close();
   }
 }

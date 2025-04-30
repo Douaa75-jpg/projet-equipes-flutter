@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../services/tache_service.dart';
 import '../screens/tache_model.dart';
-import 'package:intl/intl.dart';
+import '../services/notification_service.dart';
+import 'employee_layout.dart';
 
 class TacheScreen extends StatefulWidget {
   final String employeId;
 
-  TacheScreen({required this.employeId});
+  const TacheScreen({Key? key, required this.employeId}) : super(key: key);
 
   @override
   _TacheScreenState createState() => _TacheScreenState();
@@ -15,382 +18,294 @@ class TacheScreen extends StatefulWidget {
 class _TacheScreenState extends State<TacheScreen> {
   List<Tache> taches = [];
   bool isLoading = true;
-
-  
-
-  // Déclaration des contrôleurs
-  TextEditingController _titreController = TextEditingController();
-  TextEditingController _descriptionController = TextEditingController();
-  TextEditingController _dateLimiteController = TextEditingController();
+  final TextEditingController _titreController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _dateLimiteController = TextEditingController();
+  late NotificationService _notificationService;
 
   @override
   void initState() {
     super.initState();
+    _notificationService = NotificationService();
     _fetchTaches();
+    _initializeNotifications();
   }
 
-
-  // Fonction pour récupérer les tâches de l'employé
-  Future<void> _fetchTaches() async {
-    setState(() {
-      isLoading = true;
+  void _initializeNotifications() {
+    _notificationService.connect(widget.employeId, (message) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.green),
+        );
+      }
     });
+  }
 
+  Future<void> _fetchTaches() async {
+    setState(() => isLoading = true);
     try {
-      // Appel au service pour récupérer les tâches de l'employé
       taches = await TacheService().getTachesForEmploye(widget.employeId);
     } catch (e) {
-      // Affichage d'un message d'erreur en cas d'échec
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur lors de la récupération des tâches'),
-        backgroundColor: Colors.red,
-      ));
+      _showSnackBar('Erreur lors de la récupération des tâches', Colors.red);
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
-   // Fonction pour formater la date
   String formatDate(String date) {
     try {
-      DateTime parsedDate = DateTime.parse(date); // Convertir la chaîne en DateTime
-      return DateFormat('yyyy-MM-dd HH:mm').format(parsedDate); // Formater la date
+      return DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(date));
     } catch (e) {
-      return date; // Retourner la date telle quelle en cas d'erreur
+      return date;
     }
   }
 
-  // Fonction pour ajouter une nouvelle tâche
-Future<void> _addTache() async {
-  // فتح نافذة إدخال البيانات
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text("Ajouter une nouvelle tâche"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titreController,
-              decoration: InputDecoration(labelText: "Titre"),
-            ),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(labelText: "Description"),
-            ),
-            GestureDetector(
-              onTap: () async {
-                // Sélection de la date
-                DateTime? selectedDate = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2101),
-                );
-
-                if (selectedDate != null) {
-                  // Sélection de l'heure
-                  TimeOfDay? selectedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.fromDateTime(DateTime.now()),
-                  );
-
-                  if (selectedTime != null) {
-                    // Combiner la date et l'heure
-                    DateTime combinedDateTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      selectedTime.hour,
-                      selectedTime.minute,
-                    );
-
-                    // Formater la date et l'heure pour l'affichage
-                    String formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(combinedDateTime);
-
-                    // Mettre la date formatée dans le contrôleur de texte
-                    _dateLimiteController.text = formattedDate;
-                  }
-                }
-              },
-              child: AbsorbPointer(
-                child: TextField(
-                  controller: _dateLimiteController,
-                  decoration: InputDecoration(labelText: "Date Limite"),
+  Future<void> _addTache() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Ajouter une nouvelle tâche"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _titreController,
+                decoration: const InputDecoration(
+                  labelText: "Titre",
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: "Description",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () async {
+                  final selectedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2101),
+                  );
+                  if (selectedDate != null) {
+                    final selectedTime = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(DateTime.now()),
+                    );
+                    if (selectedTime != null) {
+                      final combinedDateTime = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
+                      );
+                      _dateLimiteController.text = 
+                          DateFormat('yyyy-MM-dd HH:mm').format(combinedDateTime);
+                    }
+                  }
+                },
+                child: AbsorbPointer(
+                  child: TextField(
+                    controller: _dateLimiteController,
+                    decoration: const InputDecoration(
+                      labelText: "Date Limite",
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+            ),
             onPressed: () async {
-              String formattedDate = formatDate(_dateLimiteController.text);
-              
               try {
-                // Tentative d'ajout de la tâche
                 await TacheService().createTache(
                   _titreController.text,
                   _descriptionController.text,
-                  formattedDate,     // La date formatée en 'yyyy-MM-dd HH:mm'
-                  widget.employeId, // استخدام employeId الذي تم تمريره في البداية
+                  formatDate(_dateLimiteController.text),
+                  widget.employeId,
                 );
-                Navigator.pop(context); // إغلاق النافذة المنبثقة
-                _fetchTaches(); // إعادة تحميل قائمة المهام
-
-                // Affichage d'un SnackBar pour informer que la tâche a été ajoutée
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Nouvelle tâche ajoutée'),
-                    backgroundColor: Colors.green, // Couleur verte pour succès
-                  ),
-                );
+                if (mounted) {
+                  Navigator.pop(context);
+                  _fetchTaches();
+                  _showSnackBar('Nouvelle tâche ajoutée', Colors.green);
+                  _clearControllers();
+                }
               } catch (e) {
-                // Affichage d'un message d'erreur si une exception est levée
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur lors de l\'ajout de la tâche: $e'),
-                    backgroundColor: Colors.red, // Couleur rouge pour erreur
-                  ),
-                );
+                _showSnackBar('Erreur: $e', Colors.red);
               }
             },
-            child: Text("Ajouter"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // إغلاق النافذة بدون إضافة المهمة
-            },
-            child: Text("Annuler"),
+            child: const Text("Ajouter"),
           ),
         ],
-      );
-    },
-  );
-}
+      ),
+    );
+  }
 
-   // Fonction pour supprimer une tâche
   Future<void> _deleteTache(String tacheId) async {
     try {
       await TacheService().deleteTache(tacheId);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Tâche supprimée avec succès'),
-        backgroundColor: Colors.green,
-      ));
-      _fetchTaches(); // Recharger les tâches après suppression
+      _fetchTaches();
+      _showSnackBar('Tâche supprimée avec succès', Colors.green);
     } catch (e) {
-      // Gestion des erreurs lors de la suppression
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur lors de la suppression de la tâche'),
-        backgroundColor: Colors.red,
-      ));
+      _showSnackBar('Erreur lors de la suppression', Colors.red);
     }
   }
 
- // Fonction pour mettre à jour une tâche
- Future<void> _updateTache(Tache tache) async {
-  // Ouvrir une boîte de dialogue pour entrer les nouvelles données
-  showDialog(
-    context: context,
-    builder: (context) {
-      _titreController.text = tache.titre; // Remplir le champ titre
-      _descriptionController.text = tache.description; // Remplir le champ description
-      _dateLimiteController.text = tache.dateLimite; // Remplir le champ dateLimite
-      String? _selectedStatut = tache.statut;
+  Future<void> _updateTache(Tache tache) async {
+    _titreController.text = tache.titre;
+    _descriptionController.text = tache.description;
+    _dateLimiteController.text = tache.dateLimite;
+    String? _selectedStatut = tache.statut;
 
-      return AlertDialog(
-        title: Text("Mettre à jour la tâche"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titreController,
-              decoration: InputDecoration(labelText: "Titre"),
-            ),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(labelText: "Description"),
-            ),
-            DropdownButtonFormField<String>(
-          value: _selectedStatut,
-          items: ['A_FAIRE', 'EN_COURS', 'TERMINEE']
-              .map((statut) => DropdownMenuItem(
-                    value: statut,
-                    child: Text(statut),
-                  ))
-              .toList(),
-          onChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _selectedStatut = value;
-              });
-            }
-          },
-          decoration: InputDecoration(labelText: "Statut"),
-        ),
-            GestureDetector(
-              onTap: () async {
-                // Sélection de la date
-                DateTime? selectedDate = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2101),
-                );
-
-                if (selectedDate != null) {
-                  // Sélection de l'heure
-                  TimeOfDay? selectedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.fromDateTime(DateTime.now()),
-                  );
-
-                  if (selectedTime != null) {
-                    // Combiner la date et l'heure
-                    DateTime combinedDateTime = DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      selectedTime.hour,
-                      selectedTime.minute,
-                    );
-
-                    // Formater la date et l'heure pour l'affichage
-                    String formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(combinedDateTime);
-
-                    // Mettre la date formatée dans le contrôleur de texte
-                    _dateLimiteController.text = formattedDate;
-                  }
-                }
-              },
-              child: AbsorbPointer(
-                child: TextField(
-                  controller: _dateLimiteController,
-                  decoration: InputDecoration(labelText: "Date Limite"),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Mettre à jour la tâche"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _titreController,
+                decoration: const InputDecoration(
+                  labelText: "Titre",
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: "Description",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _selectedStatut,
+                items: ['A_FAIRE', 'EN_COURS', 'TERMINEE']
+                    .map((statut) => DropdownMenuItem(
+                          value: statut,
+                          child: Text(statut),
+                        ))
+                    .toList(),
+                onChanged: (value) => _selectedStatut = value,
+                decoration: const InputDecoration(
+                  labelText: "Statut",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              GestureDetector(
+                onTap: () async {
+                  final selectedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2101),
+                  );
+                  if (selectedDate != null) {
+                    final selectedTime = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(DateTime.now()),
+                    );
+                    if (selectedTime != null) {
+                      final combinedDateTime = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        selectedTime.hour,
+                        selectedTime.minute,
+                      );
+                      _dateLimiteController.text = 
+                          DateFormat('yyyy-MM-dd HH:mm').format(combinedDateTime);
+                    }
+                  }
+                },
+                child: AbsorbPointer(
+                  child: TextField(
+                    controller: _dateLimiteController,
+                    decoration: const InputDecoration(
+                      labelText: "Date Limite",
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+            ),
             onPressed: () async {
-              // Validation de la date et formatage
-              String formattedDate = formatDate(_dateLimiteController.text);
-
-              // Validation si la date est correcte
-              if (formattedDate == null || formattedDate.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('Date invalide.'),
-                  backgroundColor: Colors.red,
-                ));
-                return;
-              }
-
-              // Appeler le service pour mettre à jour la tâche
               try {
                 await TacheService().updateTache(
-                  tache.id, // L'ID de la tâche à modifier
+                  tache.id,
                   _titreController.text,
                   _descriptionController.text,
-                  formattedDate, // Nouvelle date limite formatée
+                  formatDate(_dateLimiteController.text),
                   statut: _selectedStatut ?? 'A_FAIRE',
                 );
-                Navigator.pop(context); // Fermer la boîte de dialogue
-                _fetchTaches(); // Recharger la liste des tâches
-
-                // Affichage d'un message de succès
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Tâche mise à jour avec succès'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                if (mounted) {
+                  Navigator.pop(context);
+                  _fetchTaches();
+                  _showSnackBar('Tâche mise à jour', Colors.green);
+                  _clearControllers();
+                }
               } catch (e) {
-                // Affichage d'une erreur en cas de problème
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur lors de la mise à jour de la tâche: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                _showSnackBar('Erreur: $e', Colors.red);
               }
             },
-            child: Text("Mettre à jour"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Fermer sans modifier
-            },
-            child: Text("Annuler"),
+            child: const Text("Mettre à jour"),
           ),
         ],
-      );
-    },
-  );
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Mes Tâches du Jour"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: _addTache,
-          ),
-        ],
-      ),
-     body: isLoading
-    ? Center(
-        child: CircularProgressIndicator(), // Affichage de la barre de chargement
-      )
-    : ListView.builder(
-        itemCount: taches.length, // Nombre de tâches à afficher
-        itemBuilder: (context, index) {
-          final tache = taches[index];
-          return Card(
-             elevation: 5, 
-            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: ListTile(
-                    title: Text(
-                      tache.titre,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tache.description),
-                  SizedBox(height: 4),
-                  Text(
-                    "Statut : ${tache.statut}",
-                    style: TextStyle(
-                      color: _getStatusColor(tache.statut),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    "Date limite : ${formatDate(tache.dateLimite)}",
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-              trailing: IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () => _deleteTache(tache.id),
-              ),
-              onTap: () => _updateTache(tache),
-            ),
-          );
-        },
       ),
     );
+  }
+
+  void _clearControllers() {
+    _titreController.clear();
+    _descriptionController.clear();
+    _dateLimiteController.clear();
+  }
+
+  void _showSnackBar(String message, Color color) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: color,
+        ),
+      );
+    }
   }
 
   Color _getStatusColor(String statut) {
@@ -404,5 +319,126 @@ Future<void> _addTache() async {
       default:
         return Colors.black;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return EmployeeLayout(
+      title: 'Mes Tâches',
+      notificationService: _notificationService,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter une tâche'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B0000),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: _addTache,
+            ),
+          ),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : taches.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Aucune tâche trouvée',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        itemCount: taches.length,
+                        itemBuilder: (context, index) {
+                          final tache = taches[index];
+                          return Card(
+                            elevation: 3,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        tache.titre,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                      Chip(
+                                        backgroundColor:
+                                            _getStatusColor(tache.statut)
+                                                .withOpacity(0.2),
+                                        label: Text(
+                                          tache.statut,
+                                          style: TextStyle(
+                                            color: _getStatusColor(tache.statut),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(tache.description),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today,
+                                          size: 16, color: Colors.grey),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Date limite: ${formatDate(tache.dateLimite)}',
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit,
+                                            color: Colors.blue),
+                                        onPressed: () => _updateTache(tache),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () => _deleteTache(tache.id),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _notificationService.dispose();
+    _titreController.dispose();
+    _descriptionController.dispose();
+    _dateLimiteController.dispose();
+    super.dispose();
   }
 }

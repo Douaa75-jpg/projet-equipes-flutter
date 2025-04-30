@@ -6,6 +6,11 @@ import 'theme.dart' as app_theme; // Utilisation d'un alias pour le thème
 import 'screens/splash_screen.dart';
 import './screens/dashboard/employee_dashboard_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import '../../screens/auth/login_screen.dart';
+import 'DeconnexionScreen.dart';
+
+
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +50,10 @@ class MyApp extends StatelessWidget {
             routes: {
               '/': (context) =>
                   const SplashScreen(), // Page d'accueil (SplashScreen)
+              '/login': (context) => const LoginScreen(), 
               '/employee_dashboard': (context) =>
-                   EmployeeDashboard(), // Dashboard pour l'employé
+                   EmployeeDashboardScreen(), // Dashboard pour l'employé
+              '/deconnexion': (context) => const DeconnexionScreen(),     
             },
             locale: Provider.of<LanguageNotifier>(context).locale,
             supportedLocales: const [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:gestion_equipe_flutter/services/demande_service.dart';
 import 'package:gestion_equipe_flutter/services/notification_service.dart';
+import 'package:gestion_equipe_flutter/screens/employee_layout.dart';
 
 class DemandeScreen extends StatefulWidget {
   final String employeId;
@@ -29,17 +30,22 @@ class _DemandeScreenState extends State<DemandeScreen> {
   final NotificationService _notificationService = NotificationService();
   String? _lastNotification;
 
-  // Couleurs adaptées à ZETABOX
-  final Color _primaryColor = const Color(0xFF2C3E50); // لون الشريط
-  final Color _buttonColor = const Color(0xFFD32F2F); // لون الزر
-  final Color _backgroundColor = const Color(0xFFF8F9FA); // لون الخلفية
-  final Color _textColor = const Color(0xFF333333); // لون النصوص الرئيسية
-  final Color _borderColor = const Color(0xFFDDDDDD); // لون الحدود
+  // Couleurs harmonisées avec EmployeeLayout
+  final Color _primaryColor = const Color(0xFF8B0000);
+  final Color _buttonColor = const Color(0xFF8B0000);
+  final Color _backgroundColor = Colors.white;
+  final Color _textColor = Colors.black87;
+  final Color _borderColor = Colors.grey;
 
   @override
   void initState() {
     super.initState();
+    _initializeNotificationService();
+  }
+
+  void _initializeNotificationService() {
     _notificationService.connect(widget.employeId, (message) {
+      if (!mounted) return;
       setState(() {
         _lastNotification = message;
       });
@@ -77,7 +83,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
               surface: Colors.white,
               onSurface: _primaryColor,
             ),
-            dialogTheme: DialogTheme(
+            dialogTheme: const DialogTheme(
               backgroundColor: Colors.white,
             ),
           ),
@@ -108,6 +114,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
       if (time != null) {
         final selectedDateTime =
             DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        if (!mounted) return;
         setState(() {
           if (isStartDate) {
             _dateDebut = selectedDateTime;
@@ -125,14 +132,15 @@ class _DemandeScreenState extends State<DemandeScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_dateDebut == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Veuillez sélectionner une date de début")),
+        const SnackBar(content: Text("Veuillez sélectionner une date de début")),
       );
       return;
     }
 
     if (_dateDebut!.isBefore(DateTime.now())) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text("⏰ La date de début doit être dans le futur")),
@@ -141,6 +149,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
     }
 
     if (_dateFin != null && _dateFin!.isBefore(_dateDebut!)) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text("La date de fin doit être après la date de début")),
@@ -160,24 +169,26 @@ class _DemandeScreenState extends State<DemandeScreen> {
 
     final success = await demandeService.createDemande(demande);
 
+    if (!mounted) return;
     setState(() => _isSubmitting = false);
 
     if (success) {
       setState(() => _showSuccessAnimation = true);
       await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
       setState(() => _showSuccessAnimation = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('✅ Demande soumise avec succès'),
+        const SnackBar(
+          content: Text('✅ Demande soumise avec succès'),
           backgroundColor: Colors.green,
         ),
       );
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('❌ Erreur lors de l\'envoi de la demande'),
+        const SnackBar(
+          content: Text('❌ Erreur lors de l\'envoi de la demande'),
           backgroundColor: Colors.red,
         ),
       );
@@ -186,111 +197,53 @@ class _DemandeScreenState extends State<DemandeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        backgroundColor: _borderColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        centerTitle: true,
-        title: Center(
-          child: Image.asset(
-            'assets/logo.png',
-            height: 55,
-            fit: BoxFit.contain,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
+    return EmployeeLayout(
+      title: 'Nouvelle Demande',
+      notificationService: _notificationService,
+      child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Nouvelle ',
-                      style: TextStyle(
-                        fontSize:
-                            MediaQuery.of(context).size.width > 600 ? 36 : 28,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2F3A4C),
-                        shadows: const [
-                          Shadow(
-                            color: Colors.black12,
-                            blurRadius: 2,
-                            offset: Offset(1, 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Demande',
-                      style: TextStyle(
-                        fontSize:
-                            MediaQuery.of(context).size.width > 600 ? 36 : 28,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFFD32F2F),
-                      ),
-                    ),
-                  ],
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withAlpha((0.5 * 255).toInt()),
-                            spreadRadius: 2,
-                            blurRadius: 5,
-                            offset: const Offset(3, 3),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Nouvelle Demande',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF8B0000),
                           ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Formulaire de Demande",
-                              style: TextStyle(
-                                fontSize: 38,
-                                fontWeight: FontWeight.bold,
-                                color: _primaryColor,
-                              ),
-                              textAlign: TextAlign.left,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildDropdownField(),
-                            const SizedBox(height: 16),
-                            _buildReasonField(),
-                            const SizedBox(height: 16),
-                            _buildDateField(
-                                _dateDebutController, "Date de début *", true),
-                            const SizedBox(height: 16),
-                            _buildDateField(_dateFinController,
-                                "Date de fin (optionnelle)", false),
-                          ],
+                          textAlign: TextAlign.center,
                         ),
-                      ),
+                        const SizedBox(height: 20),
+                        _buildDropdownField(),
+                        const SizedBox(height: 16),
+                        _buildReasonField(),
+                        const SizedBox(height: 16),
+                        _buildDateField(
+                            _dateDebutController, "Date de début *", true),
+                        const SizedBox(height: 16),
+                        _buildDateField(_dateFinController,
+                            "Date de fin (optionnelle)", false),
+                        const SizedBox(height: 24),
+                        _buildCaptchaRow(),
+                        const SizedBox(height: 24),
+                        _buildSubmitButton(),
+                        if (_lastNotification != null) _buildNotificationBadge(),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    _buildCaptchaRow(),
-                    const SizedBox(height: 24),
-                    _buildSubmitButton(),
-                    if (_lastNotification != null) _buildNotificationBadge(),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -304,44 +257,28 @@ class _DemandeScreenState extends State<DemandeScreen> {
     return DropdownButtonFormField<String>(
       value: _typeDemande,
       onChanged: (newValue) => setState(() => _typeDemande = newValue),
-      items: [
+      items: const [
         DropdownMenuItem(
           value: 'congé',
-          child: Text('Congé', style: TextStyle(color: _textColor)),
+          child: Text('Congé'),
         ),
         DropdownMenuItem(
           value: 'absence',
-          child: Text('Absence', style: TextStyle(color: _textColor)),
+          child: Text('Absence'),
         ),
         DropdownMenuItem(
           value: 'autorization_sortie',
-          child: Text('Autorisation de sortie',
-              style: TextStyle(color: _textColor)),
+          child: Text('Autorisation de sortie'),
         ),
       ],
       decoration: InputDecoration(
         labelText: "Type de Demande *",
-        labelStyle: TextStyle(color: _textColor.withAlpha((0.7 * 255).toInt())),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _buttonColor),
-        ),
-        filled: true,
-        fillColor: _backgroundColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      style: TextStyle(color: _textColor),
-      icon: Icon(Icons.arrow_drop_down,
-          color: _textColor.withAlpha(179)), // 0.7 * 255 ≈ 179
       validator: (value) =>
           value == null ? 'Veuillez sélectionner un type de demande' : null,
     );
@@ -351,25 +288,12 @@ class _DemandeScreenState extends State<DemandeScreen> {
     return TextFormField(
       decoration: InputDecoration(
         labelText: "Raison *",
-        labelStyle: TextStyle(color: _textColor.withAlpha((0.7 * 255).toInt())),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _buttonColor),
-        ),
-        filled: true,
-        fillColor: _backgroundColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      style: TextStyle(color: _textColor),
       maxLines: 3,
       onChanged: (value) => _raison = value,
       validator: (value) =>
@@ -383,27 +307,13 @@ class _DemandeScreenState extends State<DemandeScreen> {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: _textColor.withAlpha((0.7 * 255).toInt())),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _buttonColor),
-        ),
-        filled: true,
-        fillColor: _backgroundColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon:
-            Icon(Icons.calendar_today, color: _textColor.withAlpha(179)),
+        suffixIcon: const Icon(Icons.calendar_today),
       ),
-      style: TextStyle(color: _textColor),
       readOnly: true,
       onTap: () => _selectDateTime(controller, isRequired),
       validator: isRequired
@@ -428,68 +338,43 @@ class _DemandeScreenState extends State<DemandeScreen> {
             activeColor: _buttonColor,
           ),
           const SizedBox(width: 8),
-          const Text(
-            "Je ne suis pas un robot",
-            style: TextStyle(
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Spacer(),
-          Icon(Icons.verified_user, color: Colors.blueAccent),
+          const Text("Je ne suis pas un robot"),
+          const Spacer(),
+          const Icon(Icons.verified_user, color: Colors.blue),
         ],
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    final isWeb = Theme.of(context).platform == TargetPlatform.fuchsia ||
-        Theme.of(context).platform == TargetPlatform.macOS ||
-        Theme.of(context).platform == TargetPlatform.windows ||
-        Theme.of(context).platform == TargetPlatform.linux;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        child: ElevatedButton(
-          onHover: isWeb
-              ? (hovering) {
-                  setState(() {});
-                }
-              : null,
-          onPressed: _isSubmitting ? null : _submitForm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _buttonColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: isWeb ? 5 : 2,
-          ),
-          child: _isSubmitting
-              ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : _showSuccessAnimation
-                  ? const Icon(Icons.check_circle,
-                      color: Colors.white, size: 24)
-                  : const Text(
-                      'Soumettre La Demande',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+    return ElevatedButton(
+      onPressed: _isSubmitting ? null : _submitForm,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: _buttonColor,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
+      child: _isSubmitting
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : _showSuccessAnimation
+              ? const Icon(Icons.check_circle, color: Colors.white, size: 24)
+              : const Text(
+                  'Soumettre La Demande',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
     );
   }
 
@@ -501,19 +386,16 @@ class _DemandeScreenState extends State<DemandeScreen> {
         margin: const EdgeInsets.only(top: 16),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: _primaryColor.withOpacity(0.05),
+          color: Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _primaryColor.withOpacity(0.2)),
+          border: Border.all(color: _borderColor),
         ),
         child: Row(
           children: [
             Icon(Icons.notifications, color: _buttonColor),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                _lastNotification ?? '',
-                style: TextStyle(color: _textColor),
-              ),
+              child: Text(_lastNotification ?? ''),
             ),
           ],
         ),

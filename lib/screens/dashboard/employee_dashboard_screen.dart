@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import '../../services/pointage_service.dart';
 import '../../AuthProvider.dart';
 import '../../services/notification_service.dart';
-import '../employee_layout.dart';
+import '../layoutt/employee_layout.dart';
+import '../../services/demande_service.dart';
 
 class EmployeeDashboardScreen extends StatefulWidget {
   const EmployeeDashboardScreen({super.key});
@@ -15,18 +16,21 @@ class EmployeeDashboardScreen extends StatefulWidget {
 
 class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
   late PointageService _pointageService;
+  late DemandeService _demandeService;
   late NotificationService _notificationService;
   Map<String, dynamic> _pointageStatus = {};
   Map<String, dynamic> _heuresTravail = {};
   List<dynamic> _historique = [];
-  int _absences = 0;
+  int _soldeConges = 0;
   bool _isLoading = true;
   DateTime _selectedDate = DateTime.now();
+  
 
-  @override
+   @override
   void initState() {
     super.initState();
     _pointageService = PointageService();
+    _demandeService = DemandeService(); // Initialisation du service
     _notificationService = NotificationService();
     _loadDashboardData();
     _initializeNotifications();
@@ -54,14 +58,14 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       final results = await Future.wait([
         _pointageService.calculerHeuresTravail(employeId, dateStr, dateStr),
         _pointageService.getHistorique(employeId, dateStr),
-        _pointageService.getNombreAbsences(employeId),
+        _demandeService.getSoldeConges(employeId), // Récupération du solde de congés
       ]);
 
       if (!mounted) return;
       setState(() {
         _heuresTravail = results[0] as Map<String, dynamic>;
         _historique = results[1] as List<dynamic>;
-        _absences = results[2] as int? ?? 0;
+        _soldeConges = results[2] as int;
         _isLoading = false;
       });
     } catch (e) {
@@ -105,6 +109,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: color,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -267,10 +272,10 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildStatCard(
-                          title: 'Absences',
-                          value: '$_absences',
-                          icon: Icons.warning_amber_outlined,
-                          color: Colors.orange[600]!,
+                          title: 'Solde de congés',
+                          value: '$_soldeConges jours', // Affichage du solde
+                          icon: Icons.beach_access_outlined, // Icône appropriée
+                          color: Colors.green[600]!, // Couleur verte
                         ),
                       ),
                     ],

@@ -5,9 +5,16 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
+import 'package:gestion_equipe_flutter/screens/layoutt/rh_layout.dart';
+import 'package:gestion_equipe_flutter/services/notification_service.dart';
 
 class ListeChefScreen extends StatefulWidget {
-  const ListeChefScreen({super.key});
+  final NotificationService notificationService;
+  
+  const ListeChefScreen({
+    super.key,
+    required this.notificationService,
+  });
 
   @override
   State<ListeChefScreen> createState() => _ListeChefScreenState();
@@ -67,7 +74,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
     final ByteData logoData = await rootBundle.load('assets/logo.png');
     final logo = pw.MemoryImage(logoData.buffer.asUint8List());
 
-    // الحصول على الموظفين التابعين لهذا المسؤول
     final employees = await _rhService.getEmployees();
     final teamEmployees =
         employees.where((e) => e.responsable?.id == responsable.id).toList();
@@ -192,7 +198,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
   }
 
   void _showAddResponsableDialog() {
-    // Ici vous devriez implémenter un formulaire pour ajouter un nouveau responsable
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -216,7 +221,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
           ),
           TextButton(
             onPressed: () {
-              // Ici vous devriez appeler votre service pour ajouter le responsable
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Responsable ajouté avec succès')),
@@ -287,41 +291,50 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Liste des Chefs d\'Équipe'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.picture_as_pdf),
-            onPressed: _exportToPdf,
-            tooltip: 'Exporter en PDF',
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddResponsableDialog,
-        child: Icon(Icons.add),
-        tooltip: 'Ajouter Responsable',
-      ),
-      body: Column(
+    return RhLayout(
+      title: 'Liste des Chefs d\'Équipe',
+      notificationService: widget.notificationService,
+      child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                labelText: 'Rechercher un chef d\'équipe',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear),
-                        onPressed: () {
-                          _filterResponsables('');
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: _filterResponsables,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      labelText: 'Rechercher un chef d\'équipe',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear),
+                              onPressed: () {
+                                _filterResponsables('');
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: _filterResponsables,
+                  ),
+                ),
+                SizedBox(width: 10),
+                IconButton(
+                  icon: Icon(Icons.picture_as_pdf, color: Colors.white),
+                  onPressed: _exportToPdf,
+                  tooltip: 'Exporter en PDF',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                ),
+                SizedBox(width: 10),
+                FloatingActionButton(
+                  onPressed: _showAddResponsableDialog,
+                  child: Icon(Icons.add),
+                  tooltip: 'Ajouter Responsable',
+                  mini: true,
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -333,7 +346,7 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
                             ? 'Aucun chef d\'équipe disponible'
                             : 'Aucun résultat trouvé'))
                     : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                        scrollDirection: Axis.vertical,
                         child: DataTable(
                           columns: [
                             DataColumn(label: Text('Nom')),
@@ -341,7 +354,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
                             DataColumn(label: Text('Email')),
                             DataColumn(label: Text('Matricule')),
                             DataColumn(label: Text('Date de naissance')),
-                            DataColumn(label: Text('Employés')),
                             DataColumn(label: Text('Actions')),
                           ],
                           rows: _filteredResponsables.map((responsable) {
@@ -355,16 +367,14 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
                                       DateTime.parse(
                                           responsable.datedenaissance!))
                                   : 'N/A')),
-                              DataCell(
-                                IconButton(
-                                  icon: Icon(Icons.group),
-                                  onPressed: () => _showEmployeeDetails(
-                                      context, responsable),
-                                  tooltip: 'Voir les employés',
-                                ),
-                              ),
                               DataCell(Row(
                                 children: [
+                                  IconButton(
+                                    icon: Icon(Icons.group),
+                                    onPressed: () => _showEmployeeDetails(
+                                        context, responsable),
+                                    tooltip: 'Voir les employés',
+                                  ),
                                   IconButton(
                                     icon: Icon(Icons.picture_as_pdf,
                                         color: Colors.green),
@@ -548,7 +558,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
               ? null
               : dateNaissanceController.text,
           "typeResponsable": selectedType,
-          
         };
 
         await _rhService.updateResponsable(responsable.id, updatedData);
@@ -641,4 +650,3 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
     }
   }
 }
-

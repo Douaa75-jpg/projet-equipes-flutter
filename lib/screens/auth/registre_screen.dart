@@ -104,91 +104,108 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final textStyle = const TextStyle(fontSize: 16, color: Colors.black);
+    final primaryColor = Color(0xFF8B0000); // Rouge bordeaux
+    final accentColor = Color(0xFFD32F2F); // Rouge plus clair
+    final backgroundColor = Color(0xFFF5F5F5); // Fond gris clair
+    final textColor = Color(0xFF333333); // Texte foncé
 
     return Scaffold(
-       backgroundColor: Color.fromARGB(255, 249, 233, 236), 
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text('Créer un compte '),
+        title: const Text('Créer un compte',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: primaryColor,
-        foregroundColor: Color(0xFFFFEBEE),
+        iconTheme: IconThemeData(color: Colors.white),
+        elevation: 0,
+        centerTitle: true,
       ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 4,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    buildTextField('Nom', (val) => nom = val!, textStyle),
-                    buildTextField('Prénom', (val) => prenom = val!, textStyle),
-                    buildTextField('Email', (val) => email = val!, textStyle, isEmail: true),
-                    buildTextField('Mot de passe', (val) => motDePasse = val!, textStyle, isPassword: true),
-                    buildTextField('Matricule', (val) => matricule = val, textStyle),
-                    buildDateField(textStyle),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: role,
-                      items: const [
-                        DropdownMenuItem(value: 'EMPLOYE', child: Text('Employé')),
-                        DropdownMenuItem(value: 'RESPONSABLE', child: Text('Responsable (Chef d\'équipe)')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          role = value!;
-                          if (role == 'RESPONSABLE') {
-                            selectedResponsableId = null;
-                          }
-                        });
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Rôle',
-                        labelStyle: textStyle,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    const Center(
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Color(0xFF8B0000),
+                        child: Icon(
+                          Icons.person_add,
+                          size: 40,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    const Center(
+                      child: Text(
+                        'Informations personnelles',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF8B0000),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildTextField('Nom', Icons.person, (val) => nom = val!),
+                    _buildTextField('Prénom', Icons.person_outline, (val) => prenom = val!),
+                    _buildTextField('Email', Icons.email, (val) => email = val!, isEmail: true),
+                    _buildTextField('Mot de passe', Icons.lock, (val) => motDePasse = val!,
+                        isPassword: true),
+                    _buildTextField('Matricule', Icons.badge, (val) => matricule = val),
+                    _buildDateField(),
+                    const SizedBox(height: 16),
+                    _buildRoleDropdown(),
                     if (role == 'EMPLOYE') ...[
                       const SizedBox(height: 16),
-                      isLoading
-                          ? const CircularProgressIndicator()
-                          : DropdownButtonFormField<String>(
-                              value: selectedResponsableId,
-                              items: chefsEquipe.map<DropdownMenuItem<String>>((chef) {
-                                return DropdownMenuItem(
-                                  value: chef['id'],
-                                  child: Text('${chef['nom']} ${chef['prenom']}'),
-                                );
-                              }).toList(),
-                              onChanged: (value) => setState(() => selectedResponsableId = value),
-                              decoration: InputDecoration(
-                                labelText: 'Responsable',
-                                labelStyle: textStyle,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
+                      _buildResponsableDropdown(),
                     ],
                     const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : registerUser,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                    ElevatedButton(
+                      onPressed: isLoading ? null : registerUser,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Créer'),
+                        elevation: 2,
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Créer le compte',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Retour',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -201,15 +218,28 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget buildTextField(String label, Function(String?) onSaved, TextStyle style,
+  Widget _buildTextField(String label, IconData icon, Function(String?) onSaved,
       {bool isEmail = false, bool isPassword = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: style,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: Icon(icon, color: Color(0xFF8B0000)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Color(0xFF8B0000)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.white,
         ),
         keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
         obscureText: isPassword,
@@ -230,7 +260,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget buildDateField(TextStyle style) {
+  Widget _buildDateField() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
@@ -242,6 +272,18 @@ class _RegisterPageState extends State<RegisterPage> {
             initialDate: DateTime(2000),
             firstDate: DateTime(1900),
             lastDate: DateTime.now(),
+            builder: (context, child) {
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: Color(0xFF8B0000),
+                    onPrimary: Colors.white,
+                    onSurface: Colors.black,
+                  ),
+                ),
+                child: child!,
+              );
+            },
           );
           if (pickedDate != null) {
             setState(() {
@@ -253,10 +295,105 @@ class _RegisterPageState extends State<RegisterPage> {
         decoration: InputDecoration(
           labelText: 'Date de naissance',
           hintText: 'AAAA-MM-JJ',
-          labelStyle: style,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          prefixIcon: Icon(Icons.calendar_today, color: Color(0xFF8B0000)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Color(0xFF8B0000)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.white,
         ),
       ),
     );
+  }
+
+  Widget _buildRoleDropdown() {
+    return DropdownButtonFormField<String>(
+      value: role,
+      items: const [
+        DropdownMenuItem(
+          value: 'EMPLOYE',
+          child: Text('Employé', style: TextStyle(color: Colors.black87)),
+        ),
+        DropdownMenuItem(
+          value: 'RESPONSABLE',
+          child: Text('Chef d\'équipe', style: TextStyle(color: Colors.black87)),
+        ),
+      ],
+      onChanged: (value) {
+        setState(() {
+          role = value!;
+          if (role == 'RESPONSABLE') {
+            selectedResponsableId = null;
+          }
+        });
+      },
+      decoration: InputDecoration(
+        labelText: 'Rôle',
+        prefixIcon: Icon(Icons.work, color: Color(0xFF8B0000)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Color(0xFF8B0000)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      dropdownColor: Colors.white,
+      icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
+    );
+  }
+
+  Widget _buildResponsableDropdown() {
+    return isLoading
+        ? Center(child: CircularProgressIndicator(color: Color(0xFF8B0000)))
+        : DropdownButtonFormField<String>(
+            value: selectedResponsableId,
+            items: chefsEquipe.map<DropdownMenuItem<String>>((chef) {
+              return DropdownMenuItem(
+                value: chef['id'],
+                child: Text(
+                  '${chef['nom']} ${chef['prenom']}',
+                  style: TextStyle(color: Colors.black87),
+                ),
+              );
+            }).toList(),
+            onChanged: (value) => setState(() => selectedResponsableId = value),
+            decoration: InputDecoration(
+              labelText: 'Responsable',
+              prefixIcon: Icon(Icons.supervisor_account, color: Color(0xFF8B0000)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF8B0000)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            dropdownColor: Colors.white,
+            icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
+          );
   }
 }

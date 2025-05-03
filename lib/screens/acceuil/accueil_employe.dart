@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart'; 
-import '../AuthProvider.dart';
-import '../services/notification_service.dart'; // Import ajouté
-import 'employee_layout.dart';
+import '../../AuthProvider.dart';
+import '../../services/notification_service.dart'; // Import ajouté
+import '../layoutt/employee_layout.dart';
 
 
 
@@ -62,7 +62,7 @@ class _AccueilEmployeState extends State<AccueilEmploye>
   Widget build(BuildContext context) {
     return EmployeeLayout(
       pendingTasks: _pendingTasks,
-       notificationService: _notificationService,
+      notificationService: _notificationService,
       child: NotificationListener<ScrollNotification>(
         onNotification: (scroll) {
           final double offset = scroll.metrics.pixels / 100;
@@ -151,29 +151,11 @@ class _AccueilEmployeState extends State<AccueilEmploye>
                     );
                   },
                 ),
-                const SizedBox(height: 40),
-                _buildLottieAnimation(),
               ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildLottieAnimation() {
-    try {
-      return Lottie.asset(
-        'assets/equipe.json',
-        width: 300,
-        height: 150,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.error, color: Colors.red, size: 50);
-        },
-      );
-    } catch (e) {
-      return const Icon(Icons.error, color: Colors.red, size: 50);
-    }
   }
 }

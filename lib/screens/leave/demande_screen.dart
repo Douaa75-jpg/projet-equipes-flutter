@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:gestion_equipe_flutter/services/demande_service.dart';
 import 'package:gestion_equipe_flutter/services/notification_service.dart';
-import 'package:gestion_equipe_flutter/screens/employee_layout.dart';
+import 'package:gestion_equipe_flutter/screens/layoutt/employee_layout.dart';
+import 'package:flutter/services.dart'; // Pour rootBundle
 
 class DemandeScreen extends StatefulWidget {
   final String employeId;
@@ -19,6 +20,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
   DateTime? _dateDebut;
   DateTime? _dateFin;
   String? _raison;
+  int _soldeConges = 22;
 
   final _dateDebutController = TextEditingController();
   final _dateFinController = TextEditingController();
@@ -29,6 +31,13 @@ class _DemandeScreenState extends State<DemandeScreen> {
   final demandeService = DemandeService();
   final NotificationService _notificationService = NotificationService();
   String? _lastNotification;
+
+  // Mapping des types de demande
+  final Map<String, String> _typeMapping = {
+    'congé': 'CONGE',
+    'absence': 'ABSENCE',
+    'autorization_sortie': 'AUTORISATION_SORTIE'
+  };
 
   // Couleurs harmonisées avec EmployeeLayout
   final Color _primaryColor = const Color(0xFF8B0000);
@@ -41,6 +50,30 @@ class _DemandeScreenState extends State<DemandeScreen> {
   void initState() {
     super.initState();
     _initializeNotificationService();
+     _loadSoldeConges();
+    _loadAsset();
+  }
+
+  Future<void> _loadAsset() async {
+    try {
+      await rootBundle.load('assets/equipe.png');
+    } catch (e) {
+      print('Error loading asset: $e');
+    }
+  }
+
+   Future<void> _loadSoldeConges() async {
+    try {
+      final solde = await demandeService.getSoldeConges(widget.employeId);
+      if (mounted) {
+        setState(() => _soldeConges = solde);
+      }
+    } catch (e) {
+      print('Erreur chargement solde: $e');
+      if (mounted) {
+        setState(() => _soldeConges = 22); // Valeur par défaut en cas d'erreur
+      }
+    }
   }
 
   void _initializeNotificationService() {
@@ -131,10 +164,28 @@ class _DemandeScreenState extends State<DemandeScreen> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_typeDemande == 'congé') {
+      final days =
+          _dateFin != null ? _dateFin!.difference(_dateDebut!).inDays + 1 : 1;
+
+      if (_soldeConges < days) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('❌ Solde insuffisant. Il vous reste $_soldeConges jours'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
     if (_dateDebut == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez sélectionner une date de début")),
+        const SnackBar(
+            content: Text("Veuillez sélectionner une date de début")),
       );
       return;
     }
@@ -157,38 +208,57 @@ class _DemandeScreenState extends State<DemandeScreen> {
       return;
     }
 
+    if (_typeDemande == null || _typeMapping[_typeDemande!] == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez sélectionner un type valide")),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    final demande = {
-      'employeId': widget.employeId,
-      'type': _typeDemande?.toLowerCase(),
-      'dateDebut': _dateDebut?.toIso8601String(),
-      'dateFin': _dateFin?.toIso8601String(),
-      'raison': _raison,
-    };
+    try {
+      final demande = {
+        'employeId': widget.employeId,
+        'type': _typeMapping[_typeDemande!], // Utilisation du mapping
+        'dateDebut': _dateDebut!.toIso8601String(),
+        'dateFin': _dateFin?.toIso8601String(),
+        'raison': _raison,
+      };
 
-    final success = await demandeService.createDemande(demande);
+      final success = await demandeService.createDemande(demande);
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-
-    if (success) {
-      setState(() => _showSuccessAnimation = true);
-      await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
-      setState(() => _showSuccessAnimation = false);
+      setState(() => _isSubmitting = false);
 
+      if (success) {
+        setState(() => _showSuccessAnimation = true);
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        setState(() => _showSuccessAnimation = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Demande soumise avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Erreur lors de l\'envoi de la demande'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Demande soumise avec succès'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ Erreur lors de l\'envoi de la demande'),
+        SnackBar(
+          content: Text('Erreur: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -236,11 +306,41 @@ class _DemandeScreenState extends State<DemandeScreen> {
                         const SizedBox(height: 16),
                         _buildDateField(_dateFinController,
                             "Date de fin (optionnelle)", false),
+                        if (_typeDemande == 'congé')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Solde disponible: $_soldeConges jours',
+                                  style: TextStyle(
+                                    color: _soldeConges > 0
+                                        ? _primaryColor
+                                        : Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (_soldeConges <= 0)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      'Vous n\'avez plus de jours de congé disponibles',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 24),
                         _buildCaptchaRow(),
                         const SizedBox(height: 24),
                         _buildSubmitButton(),
-                        if (_lastNotification != null) _buildNotificationBadge(),
+                        if (_lastNotification != null)
+                          _buildNotificationBadge(),
                       ],
                     ),
                   ),

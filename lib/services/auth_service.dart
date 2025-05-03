@@ -32,8 +32,7 @@ class AuthService {
             'access_token': token,
             'role': role,
             'typeResponsable': typeResponsable,
-             'nom': nom,
-
+            'nom': nom,
           };
         } else {
           throw Exception('Jeton d\'accès manquant dans la réponse du backend');
@@ -44,6 +43,45 @@ class AuthService {
     } on DioException catch (e) {
       print('Erreur de connexion: $e');
       throw Exception('Erreur de connexion: ${e.message}');
+    }
+  }
+
+  Future<void> forgotPassword(String email) async {
+    try {
+      final response = await _dio.post(
+        '/forgot-password',
+        data: {'email': email},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Échec de l\'envoi du lien de réinitialisation');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Erreur de connexion');
+    }
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        '/reset-password',
+        data: {
+          'token': token,
+          'newPassword': newPassword,
+        },
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Échec de la réinitialisation');
+      }
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'Erreur de connexion');
     }
   }
 
@@ -71,9 +109,6 @@ class AuthService {
     return token != null && !JwtDecoder.isExpired(token);
   }
 
-
-
-  // Vérification du stockage du token
   Future<void> verifyTokenStorage() async {
     try {
       String? storedToken = await _storage.read(key: 'jwt_token');
@@ -91,42 +126,6 @@ class AuthService {
       }
     } catch (e) {
       print('Erreur lors de la lecture du token: $e');
-    }
-  }
-
-  // Fonction pour utiliser le token stocké avec Dio
-  Future<void> useTokenWithApi() async {
-    try {
-      String? token = await _storage.read(key: 'jwt_token');
-
-      if (token != null) {
-        final dio = Dio();
-        dio.options.headers = {
-          'Authorization': 'Bearer $token',
-        };
-
-        // Exemple d'appel API avec le token
-        final response = await dio.get('http://localhost:3000/auth');
-        if (response.statusCode == 200) {
-          print('Réponse de l\'API avec le token: ${response.data}');
-        } else {
-          print('Erreur API: ${response.statusCode}');
-        }
-      } else {
-        print('Le token n\'est pas disponible!');
-      }
-    } catch (e) {
-      print('Erreur d\'appel API avec le token: $e');
-    }
-  }
-
-  // Fonction pour supprimer le token
-  Future<void> deleteToken() async {
-    try {
-      await _storage.delete(key: 'jwt_token');
-      print('Le token a été supprimé');
-    } catch (e) {
-      print('Erreur lors de la suppression du token: $e');
     }
   }
 }

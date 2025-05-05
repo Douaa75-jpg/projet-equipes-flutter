@@ -20,7 +20,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
   DateTime? _dateDebut;
   DateTime? _dateFin;
   String? _raison;
-  int _soldeConges = 22;
+  int _soldeConges = 30;
 
   final _dateDebutController = TextEditingController();
   final _dateFinController = TextEditingController();
@@ -71,7 +71,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
     } catch (e) {
       print('Erreur chargement solde: $e');
       if (mounted) {
-        setState(() => _soldeConges = 22); // Valeur par défaut en cas d'erreur
+        setState(() => _soldeConges = 30); // Valeur par défaut en cas d'erreur
       }
     }
   }

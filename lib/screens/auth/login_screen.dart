@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:gestion_equipe_flutter/services/auth_service.dart';
-import 'package:gestion_equipe_flutter/screens/dashboard/rh_dashboard_screen.dart';
-import 'package:gestion_equipe_flutter/screens/dashboard/employee_dashboard_screen.dart';
-import 'package:gestion_equipe_flutter/screens/dashboard/chef_equipe_dashboard_screen.dart';
+import 'package:gestion_equipe_flutter/screens/acceuil/accueil_chef_.dart';
 import 'package:gestion_equipe_flutter/screens/dashboard/admin_dashboard_screen.dart';
 import 'package:gestion_equipe_flutter/AuthProvider.dart';
 import 'package:gestion_equipe_flutter/screens/auth/reset_password_screen.dart';
@@ -122,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
         case TypeResponsable.chefEquipe:
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const ChefEquipeDashboard()),
+            MaterialPageRoute(builder: (context) => const Accueilchef()),
           );
           break;
         case TypeResponsable.rh:

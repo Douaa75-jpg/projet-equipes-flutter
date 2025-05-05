@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Ajouté pour rootBundle
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../services/chef_equipe_service.dart';
+import '../screens/layoutt/chef_layout.dart';
 
 class EmployePointageHistoryScreen extends StatefulWidget {
   final String employeId;
   final String chefId;
 
   const EmployePointageHistoryScreen({
-    Key? key, 
+    Key? key,
     required this.employeId,
     required this.chefId,
   }) : super(key: key);
@@ -28,8 +29,7 @@ class _EmployePointageHistoryScreenState
   bool _isLoading = true;
   String? _errorMessage;
   DateTimeRange? _selectedDateRange;
-  
-  // Informations de l'employé
+
   String _nom = '';
   String _prenom = '';
   String _email = '';
@@ -45,23 +45,23 @@ class _EmployePointageHistoryScreenState
   Future<void> _loadPointageHistory() async {
     try {
       setState(() => _isLoading = true);
-      
-      // Charger les informations de l'employé
-      final employeInfo = await _chefEquipeService.getEmployeInfo(widget.employeId);
-      
+
+      final employeInfo =
+          await _chefEquipeService.getEmployeInfo(widget.employeId);
+
       if (employeInfo != null) {
         setState(() {
           _nom = employeInfo['nom'] ?? '';
           _prenom = employeInfo['prenom'] ?? '';
           _email = employeInfo['email'] ?? '';
           _matricule = employeInfo['matricule'] ?? '';
-          _dateNaissance = employeInfo['datedenaissance'] != null 
-            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(employeInfo['datedenaissance']))
-            : '';
+          _dateNaissance = employeInfo['datedenaissance'] != null
+              ? DateFormat('dd/MM/yyyy')
+                  .format(DateTime.parse(employeInfo['datedenaissance']))
+              : '';
         });
       }
 
-      // Charger l'historique de pointage
       final history = await _chefEquipeService.getHistoriqueEquipe(
         widget.chefId,
         employeId: widget.employeId,
@@ -94,12 +94,13 @@ class _EmployePointageHistoryScreenState
       context: context,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
-      initialDateRange: _selectedDateRange ?? DateTimeRange(
-        start: DateTime.now().subtract(const Duration(days: 7)),
-        end: DateTime.now(),
-      ),
+      initialDateRange: _selectedDateRange ??
+          DateTimeRange(
+            start: DateTime.now().subtract(const Duration(days: 7)),
+            end: DateTime.now(),
+          ),
     );
-    
+
     if (picked != null) {
       setState(() => _selectedDateRange = picked);
       await _loadPointageHistoryWithDates();
@@ -111,7 +112,7 @@ class _EmployePointageHistoryScreenState
 
     try {
       setState(() => _isLoading = true);
-      
+
       final history = await _chefEquipeService.getHistoriqueEquipe(
         widget.chefId,
         employeId: widget.employeId,
@@ -141,11 +142,10 @@ class _EmployePointageHistoryScreenState
     }
   }
 
-   Future<void> _generateAndExportPDF() async {
+  Future<void> _generateAndExportPDF() async {
     try {
       final pdf = pw.Document();
 
-      // En-tête du PDF
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -164,10 +164,7 @@ class _EmployePointageHistoryScreenState
                     ),
                   ),
                 ),
-                
                 pw.SizedBox(height: 20),
-                
-                // Informations employé
                 pw.Container(
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(),
@@ -193,57 +190,48 @@ class _EmployePointageHistoryScreenState
                     ],
                   ),
                 ),
-                
                 pw.SizedBox(height: 20),
-                
-                // Période sélectionnée
                 if (_selectedDateRange != null)
                   pw.Row(
                     children: [
-                      pw.Text('Période: ', 
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Période: ',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text(
-                        '${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - '
-                        '${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}'
-                      ),
+                          '${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - '
+                          '${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}'),
                     ],
                   ),
-                
                 pw.SizedBox(height: 20),
-                
-                // Tableau des pointages
                 pw.Text('Historique des Pointages',
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    )),
                 pw.SizedBox(height: 10),
-                
                 _pointages.isEmpty
-                  ? pw.Text('Aucun pointage trouvé')
-                  : pw.Table.fromTextArray(
-                      context: context,
-                      border: pw.TableBorder.all(),
-                      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                      headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-                      headers: ['Date', 'Type', 'Heure', 'Statut'],
-                      data: _pointages.map((pointage) => [
-                        DateFormat('dd/MM/yyyy').format(
-                          DateTime.parse(pointage['date'] ?? DateTime.now().toString())),
-                        pointage['typeLibelle'] ?? pointage['type'] ?? '',
-                        pointage['heure'] ?? '',
-                        pointage['statut'] ?? 'Présent',
-                      ]).toList(),
-                    ),
+                    ? pw.Text('Aucun pointage trouvé')
+                    : pw.Table.fromTextArray(
+                        context: context,
+                        border: pw.TableBorder.all(),
+                        headerStyle:
+                            pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        headerDecoration:
+                            pw.BoxDecoration(color: PdfColors.grey300),
+                        headers: ['Date', 'Type', 'Heure', 'Statut'],
+                        data: _pointages.map((pointage) => [
+                              DateFormat('dd/MM/yyyy').format(DateTime.parse(
+                                  pointage['date'] ?? DateTime.now().toString())),
+                              pointage['typeLibelle'] ?? pointage['type'] ?? '',
+                              pointage['heure'] ?? '',
+                              pointage['statut'] ?? 'Présent',
+                            ]).toList(),
+                      ),
               ],
             );
           },
         ),
       );
 
-      // Impression/export
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
       );
@@ -256,7 +244,6 @@ class _EmployePointageHistoryScreenState
       );
     }
   }
-
 
   pw.Widget _buildPdfInfoRow(String label, String value) {
     return pw.Row(
@@ -276,43 +263,13 @@ class _EmployePointageHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historique de Pointage'),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color.fromARGB(255, 157, 18, 18), Color.fromARGB(255, 204, 23, 23)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-            onPressed: _generateAndExportPDF,
-            tooltip: 'Exporter en PDF',
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today, color: Colors.white),
-            onPressed: () => _selectDateRange(context),
-            tooltip: 'Choisir une période',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadPointageHistory,
-            tooltip: 'Actualiser',
-          ),
-        ],
-      ),
-      body: _buildBody(),
+    return ChefLayout(
+      title: 'Historique de Pointage',
+      child: _buildBodyContent(),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBodyContent() {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -331,7 +288,7 @@ class _EmployePointageHistoryScreenState
         ),
       );
     }
-    
+
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -349,7 +306,7 @@ class _EmployePointageHistoryScreenState
                 _errorMessage!,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Color.fromARGB(255, 157, 18, 18),
+                  color: const Color(0xFF8B0000),
                   fontSize: 16,
                 ),
               ),
@@ -358,7 +315,7 @@ class _EmployePointageHistoryScreenState
             ElevatedButton(
               onPressed: _loadPointageHistory,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color.fromARGB(255, 157, 18, 18), // Changé de primary à backgroundColor
+                backgroundColor: const Color(0xFF8B0000),
                 padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -373,259 +330,333 @@ class _EmployePointageHistoryScreenState
         ),
       );
     }
-    
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Carte d'information de l'employé
-          Container(
-            margin: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 2,
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF8B0000)),
+                onPressed: _generateAndExportPDF,
+                tooltip: 'Exporter en PDF',
+              ),
+              IconButton(
+                icon: const Icon(Icons.calendar_today, color: Color(0xFF8B0000)),
+                onPressed: () => _selectDateRange(context),
+                tooltip: 'Choisir une période',
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Color(0xFF8B0000)),
+                onPressed: _loadPointageHistory,
+                tooltip: 'Actualiser',
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 2,
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Informations du Employé',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF8B0000),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'ID: ${widget.employeId}',
+                                style: TextStyle(
+                                  color: const Color(0xFF8B0000),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildInfoRow('Nom', _nom),
+                        _buildInfoRow('Prénom', _prenom),
+                        _buildInfoRow('Matricule', _matricule),
+                        _buildInfoRow('Email', _email),
+                        _buildInfoRow('Date de naissance', _dateNaissance),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                if (_selectedDateRange != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.calendar_today,
+                            size: 18, color: Colors.blue.shade700),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Période: ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}',
+                          style: TextStyle(
+                            color: const Color(0xFF8B0000),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Row(
                     children: [
                       Text(
-                        'Informations du Employé',
+                        'Historique des Pointages',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 157, 18, 18),
+                          color: const Color(0xFF8B0000),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'ID: ${widget.employeId}',
-                          style: TextStyle(
-                            color: const Color.fromARGB(255, 192, 21, 21),
-                            fontSize: 12,
-                          ),
+                      const Spacer(),
+                      Text(
+                        'Total: ${_pointages.length}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _buildInfoRow('Nom', _nom),
-                  _buildInfoRow('Prénom', _prenom),
-                  _buildInfoRow('Matricule', _matricule),
-                  _buildInfoRow('Email', _email),
-                  _buildInfoRow('Date de naissance', _dateNaissance),
-                ],
-              ),
-            ),
-          ),
-          
-          // Période sélectionnée
-          if (_selectedDateRange != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16.0),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.calendar_today, size: 18, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Période: ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(_selectedDateRange!.end)}',
-                    style: TextStyle(
-                      color: const Color.fromARGB(255, 192, 21, 21),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          const SizedBox(height: 16),
-          
-          // Titre de la section historique
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              children: [
-                Text(
-                  'Historique des Pointages',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: const Color.fromARGB(255, 192, 21, 21),
-                  ),
                 ),
-                const Spacer(),
-                Text(
-                  'Total: ${_pointages.length}',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Tableau des pointages
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16.0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 2,
-                  blurRadius: 5,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: _pointages.isEmpty
-                ? Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.hourglass_empty,
-                            size: 50,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Aucun pointage trouvé',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
+                const SizedBox(height: 12),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: const Offset(0, 3),
                       ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: DataTable(
-                        columnSpacing: 24,
-                        horizontalMargin: 16,
-                        headingRowColor: MaterialStateProperty.resolveWith<Color>(
-                          (states) => Colors.blue.shade50,
-                        ),
-                        columns: [
-                          DataColumn(
-                            label: Text(
-                              'Date',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromARGB(255, 157, 18, 18),
-                              ),
-                            ),
+                    ],
+                  ),
+                  child: _pointages.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          DataColumn(
-                            label: Text(
-                              'Type',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromARGB(255, 157, 18, 18),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Text(
-                              'Heure',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromARGB(255, 157, 18, 18),
-                              ),
-                            ),
-                          ),
-                          DataColumn(
-                            label: Text(
-                              'Statut',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromARGB(255, 157, 18, 18),
-                              ),
-                            ),
-                          ),
-                        ],
-                        rows: _pointages.map((pointage) {
-                          final isAbsent = (pointage['statut'] ?? 'Présent') == 'Absent';
-                          return DataRow(
-                            cells: [
-                              DataCell(Text(
-                                DateFormat('dd/MM/yyyy').format(
-                                  DateTime.parse(pointage['date'] ?? DateTime.now().toString())),
-                              )),
-                              DataCell(Text(pointage['typeLibelle'] ?? pointage['type'] ?? '')),
-                              DataCell(Text(pointage['heure'] ?? '')),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isAbsent
-                                        ? Colors.red.shade50
-                                        : Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isAbsent
-                                          ? Colors.red.shade200
-                                          : Colors.green.shade200,
-                                    ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.hourglass_empty,
+                                  size: 50,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Aucun pointage trouvé',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 16,
                                   ),
-                                  child: Text(
-                                    pointage['statut'] ?? 'Présent',
-                                    style: TextStyle(
-                                      color: isAbsent ? Colors.red : Colors.green,
-                                      fontWeight: FontWeight.w500,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: constraints.maxWidth,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: DataTable(
+                                    columnSpacing: 24,
+                                    horizontalMargin: 16,
+                                    headingRowColor:
+                                        MaterialStateProperty.resolveWith<Color>(
+                                      (states) => Colors.blue.shade50,
                                     ),
+                                    columns: [
+                                      DataColumn(
+                                        label: Container(
+                                          width: constraints.maxWidth * 0.25,
+                                          child: Center(
+                                            child: Text(
+                                              'Date',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF8B0000),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Container(
+                                          width: constraints.maxWidth * 0.25,
+                                          child: Center(
+                                            child: Text(
+                                              'Type',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF8B0000),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Container(
+                                          width: constraints.maxWidth * 0.25,
+                                          child: Center(
+                                            child: Text(
+                                              'Heure',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF8B0000),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Container(
+                                          width: constraints.maxWidth * 0.25,
+                                          child: Center(
+                                            child: Text(
+                                              'Statut',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF8B0000),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    rows: _pointages.asMap().entries.map((entry) {
+                                      final index = entry.key;
+                                      final pointage = entry.value;
+                                      final isAbsent =
+                                          (pointage['statut'] ?? 'Présent') == 'Absent';
+                                      
+                                      return DataRow(
+                                        color: MaterialStateProperty.resolveWith<Color>(
+                                          (states) => index % 2 == 0 ? Colors.grey.shade50 : Colors.white,
+                                        ),
+                                        cells: [
+                                          DataCell(
+                                            Center(
+                                              child: Text(
+                                                DateFormat('dd/MM/yyyy').format(
+                                                  DateTime.parse(pointage['date'] ?? DateTime.now().toString())),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Center(
+                                              child: Text(
+                                                pointage['typeLibelle'] ?? pointage['type'] ?? '',
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Center(
+                                              child: Text(pointage['heure'] ?? ''),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Center(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 12, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: isAbsent
+                                                      ? Colors.red.shade50
+                                                      : Colors.green.shade50,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  border: Border.all(
+                                                    color: isAbsent
+                                                        ? Colors.red.shade200
+                                                        : Colors.green.shade200,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  pointage['statut'] ?? 'Présent',
+                                                  style: TextStyle(
+                                                    color: isAbsent ? Colors.red : Colors.green,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
                                   ),
                                 ),
                               ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

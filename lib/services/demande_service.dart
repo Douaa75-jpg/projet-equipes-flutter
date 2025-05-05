@@ -89,7 +89,7 @@ class DemandeService {
       if (response.statusCode == 200) {
         return data['soldeConges'] is int 
           ? data['soldeConges'] 
-          : int.tryParse(data['soldeConges'].toString()) ?? 22;
+          : int.tryParse(data['soldeConges'].toString()) ?? 30;
       } else {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
@@ -191,4 +191,38 @@ Future<void> rejectDemande(
       throw Exception('Erreur réseau: $e');
     }
   }
+
+  Future<List<dynamic>> getTeamLeaveRequests(String responsableId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/demande/equipe/en-conge/$responsableId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur réseau: $e');
+  }
+}
+
+Future<List<dynamic>> getUpcomingTeamLeaveRequests(String responsableId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/demande/equipe/conges-a-venir/$responsableId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur réseau: $e');
+  }
+}
 }

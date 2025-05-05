@@ -110,4 +110,16 @@ class ChefEquipeService {
       throw Exception('Échec du chargement des informations de l\'employé: ${response.statusCode}');
     }
   }
+
+  Future<int> getNombreEmployesSousResponsable(String chefId) async {
+  final url = Uri.parse('$_baseUrl/$chefId/nombre-employes');
+  final response = await http.get(url, headers: await _getHeaders());
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['nombreEmployes'] as int;
+  } else {
+    throw Exception('Échec du chargement du nombre d\'employés: ${response.statusCode}');
+  }
+}
 }

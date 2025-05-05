@@ -56,8 +56,9 @@ class RhService {
     }
   }
 
-   // Méthode pour mettre à jour un employé
-  Future<Map<String, dynamic>> updateEmployee(String id, Map<String, dynamic> updateData) async {
+  // Méthode pour mettre à jour un employé
+  Future<Map<String, dynamic>> updateEmployee(
+      String id, Map<String, dynamic> updateData) async {
     final url = Uri.parse('$baseUrlEmployes/$id');
     final response = await http.put(
       url,
@@ -85,29 +86,31 @@ class RhService {
   }
 
   // Méthode pour mettre à jour un responsable
-  Future<Map<String, dynamic>> updateResponsable(String id, Map<String, dynamic> updateData) async {
-  // Structurer les données comme attendu par le backend
-  final dataToSend = {
-    "nom": updateData["nom"],
-    "prenom": updateData["prenom"],
-    "email": updateData["email"],
-    "typeResponsable": updateData["typeResponsable"],
-    "matricule": updateData["matricule"],
-    "datedenaissance": updateData["datedenaissance"],
-  };
+  Future<Map<String, dynamic>> updateResponsable(
+      String id, Map<String, dynamic> updateData) async {
+    // Structurer les données comme attendu par le backend
+    final dataToSend = {
+      "nom": updateData["nom"],
+      "prenom": updateData["prenom"],
+      "email": updateData["email"],
+      "typeResponsable": updateData["typeResponsable"],
+      "matricule": updateData["matricule"],
+      "datedenaissance": updateData["datedenaissance"],
+    };
 
-  final response = await http.put(
-    Uri.parse('$baseUrlResponsables/$id'),
-    headers: {"Content-Type": "application/json"},
-    body: json.encode(dataToSend),
-  );
+    final response = await http.put(
+      Uri.parse('$baseUrlResponsables/$id'),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode(dataToSend),
+    );
 
-  if (response.statusCode == 200) {
-    return json.decode(response.body);
-  } else {
-    throw Exception('Erreur lors de la mise à jour du responsable: ${response.body}');
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception(
+          'Erreur lors de la mise à jour du responsable: ${response.body}');
+    }
   }
-}
 
   // Méthode pour supprimer un responsable
   Future<Map<String, dynamic>> deleteResponsable(String id) async {
@@ -122,17 +125,15 @@ class RhService {
   }
 }
 
-
 // Définition de la classe Responsable
 class Responsable {
-   final String id;
+  final String id;
   final String nom;
   final String prenom;
   final String email;
   final String? matricule;
   final String? datedenaissance;
   final String typeResponsable;
-
 
   Responsable({
     required this.id,
@@ -144,7 +145,7 @@ class Responsable {
     required this.typeResponsable,
   });
 
- factory Responsable.fromJson(Map<String, dynamic> json) {
+  factory Responsable.fromJson(Map<String, dynamic> json) {
     return Responsable(
       id: json['id'] ?? '',
       nom: json['utilisateur']?['nom'] ?? 'Inconnu',
@@ -173,14 +174,14 @@ class Employe {
     this.responsable,
   });
 
-   factory Employe.fromJson(Map<String, dynamic> json) {
+  factory Employe.fromJson(Map<String, dynamic> json) {
     return Employe(
       id: json['id'] ?? '',
       nom: json['utilisateur']?['nom'] ?? '',
       prenom: json['utilisateur']?['prenom'] ?? '',
       email: json['utilisateur']?['email'] ?? '',
-      responsable: json['responsable'] != null 
-          ? Responsable.fromJson(json['responsable']) 
+      responsable: json['responsable'] != null
+          ? Responsable.fromJson(json['responsable'])
           : null,
     );
   }

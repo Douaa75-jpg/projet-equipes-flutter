@@ -18,7 +18,6 @@ class _RegisterPageState extends State<RegisterPage> {
   String role = 'EMPLOYE';
   String? matricule;
   String? datedenaissance;
-  String? selectedResponsableId;
   List<dynamic> chefsEquipe = [];
 
   bool isLoading = false;
@@ -26,7 +25,6 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
-    fetchChefsEquipe();
   }
 
   Future<void> fetchChefsEquipe() async {
@@ -48,13 +46,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
     _formKey.currentState!.save();
 
-    if (role == 'EMPLOYE' && selectedResponsableId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez sélectionner un responsable.')),
-      );
-      return;
-    }
-
     if (datedenaissance == null || datedenaissance!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('La date de naissance est requise.')),
@@ -71,10 +62,6 @@ class _RegisterPageState extends State<RegisterPage> {
       'matricule': matricule,
       'datedenaissance': datedenaissance,
     };
-
-    if (role == 'EMPLOYE' && selectedResponsableId != null) {
-      userData['responsableId'] = selectedResponsableId;
-    }
 
     if (role == 'RESPONSABLE') {
       userData['typeResponsable'] = 'CHEF_EQUIPE';
@@ -167,10 +154,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     _buildDateField(),
                     const SizedBox(height: 16),
                     _buildRoleDropdown(),
-                    if (role == 'EMPLOYE') ...[
-                      const SizedBox(height: 16),
-                      _buildResponsableDropdown(),
-                    ],
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: isLoading ? null : registerUser,
@@ -331,9 +314,6 @@ class _RegisterPageState extends State<RegisterPage> {
       onChanged: (value) {
         setState(() {
           role = value!;
-          if (role == 'RESPONSABLE') {
-            selectedResponsableId = null;
-          }
         });
       },
       decoration: InputDecoration(
@@ -357,43 +337,5 @@ class _RegisterPageState extends State<RegisterPage> {
       dropdownColor: Colors.white,
       icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
     );
-  }
-
-  Widget _buildResponsableDropdown() {
-    return isLoading
-        ? Center(child: CircularProgressIndicator(color: Color(0xFF8B0000)))
-        : DropdownButtonFormField<String>(
-            value: selectedResponsableId,
-            items: chefsEquipe.map<DropdownMenuItem<String>>((chef) {
-              return DropdownMenuItem(
-                value: chef['id'],
-                child: Text(
-                  '${chef['nom']} ${chef['prenom']}',
-                  style: TextStyle(color: Colors.black87),
-                ),
-              );
-            }).toList(),
-            onChanged: (value) => setState(() => selectedResponsableId = value),
-            decoration: InputDecoration(
-              labelText: 'Responsable',
-              prefixIcon: Icon(Icons.supervisor_account, color: Color(0xFF8B0000)),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Color(0xFF8B0000)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-            ),
-            dropdownColor: Colors.white,
-            icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
-          );
   }
 }

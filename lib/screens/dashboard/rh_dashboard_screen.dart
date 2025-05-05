@@ -35,6 +35,10 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
     theme = Theme.of(context);
   }
 
+  int _calculateLeaveDays(DateTime start, DateTime end) {
+    return end.difference(start).inDays + 1;
+  }
+
   @override
   Widget build(BuildContext context) {
     return RhLayout(
@@ -54,7 +58,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           const SizedBox(height: 24),
           _buildStatsGrid(context),
           const SizedBox(height: 32),
-          _buildRecentRequestsSection(theme),
+          _buildUpcomingLeavesSection(theme),
           const SizedBox(height: 32),
           _buildNotificationsSection(theme),
         ],
@@ -189,28 +193,29 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           trend: 'No change',
         ),
         StatCard(
-          title: 'Absences aujourd\'hui',
-          valueFuture: pointageService.getNombreEmployesAbsentAujourdhui()
-              .catchError((e) {
-            log('Error fetching absences: $e');
-            return 0;
-          }),
-          icon: Icons.pending_actions,
-          color: Colors.orange,
-          trend: 'Dernière mise à jour:',
-        ),
-        StatCard(
           title: 'Présent aujourd\'hui',
           valueFuture: pointageService.getNombreEmployesPresentAujourdhui(),
           icon: Icons.check_circle_outline,
           color: Colors.purple,
           trend: 'Dernière mise à jour: ${DateFormat('HH:mm').format(DateTime.now())}',
         ),
+        StatCard(
+          title: 'Congés à venir',
+          valueFuture: demandeService.getUpcomingLeaves()
+              .then((conges) => conges.length)
+              .catchError((e) {
+            log('Error fetching upcoming leaves: $e');
+            return 0;
+          }),
+          icon: Icons.event_available, // Changed from event_upcoming to event_available
+          color: Colors.teal,
+          trend: 'Prochain congé',
+        ),
       ],
     );
   }
 
-  Widget _buildRecentRequestsSection(ThemeData theme) {
+  Widget _buildUpcomingLeavesSection(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -218,7 +223,7 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Demandes récentes',
+              'Congés à venir',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -241,30 +246,45 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
             height: 300,
             padding: const EdgeInsets.all(8),
             child: FutureBuilder<List<dynamic>>(
-              future: demandeService.getAllDemandes(),
+              future: demandeService.getUpcomingLeaves(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
                   return Center(child: Text('Erreur: ${snapshot.error}'));
-                } else if (!snapshot.hasData || (snapshot.data is! List) || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('Aucune demande récente'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('Aucun congé à venir'));
                 } else {
-                  final demandes = snapshot.data is Map 
-                      ? (snapshot.data as Map)['demandes'] ?? [] 
-                      : snapshot.data as List;
                   return ListView.builder(
                     physics: const BouncingScrollPhysics(),
-                    itemCount: demandes.length,
+                    itemCount: snapshot.data!.length,
                     itemBuilder: (context, index) {
+                      final conge = snapshot.data![index];
+                      final dateDebut = DateTime.parse(conge['dateDebut']);
+                      final dateFin = DateTime.parse(conge['dateFin']);
+                      final jours = _calculateLeaveDays(dateDebut, dateFin);
+                      
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: _buildRequestItem(
-                          _getEmployeeName(demandes[index]),
-                          _formatType(demandes[index]['type']?.toString() ?? 'Type inconnu'),
-                          _formatDate(demandes[index]['dateDebut']),
-                          _getStatusText(demandes[index]['statut']?.toString() ?? 'EN_ATTENTE'),
-                          _getStatusColor(demandes[index]['statut']?.toString() ?? 'EN_ATTENTE'),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: Text(
+                              '${conge['employe']['utilisateur']['prenom'][0]}${conge['employe']['utilisateur']['nom'][0]}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(
+                            '${conge['employe']['utilisateur']['prenom']} ${conge['employe']['utilisateur']['nom']}',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Text(
+                            '${DateFormat('dd/MM/yyyy').format(dateDebut)} - ${DateFormat('dd/MM/yyyy').format(dateFin)}',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          trailing: Text(
+                            '$jours jours',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       );
                     },
@@ -335,128 +355,6 @@ class _RHDashboardScreenState extends State<RHDashboardScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  String _getEmployeeName(Map<String, dynamic> demande) {
-    if (demande['employe'] != null && demande['employe']['utilisateur'] != null) {
-      return '${demande['employe']['utilisateur']['prenom']} ${demande['employe']['utilisateur']['nom']}';
-    }
-    return 'Employé inconnu';
-  }
-
-  String _formatDate(dynamic date) {
-    if (date == null) return 'Date inconnue';
-    try {
-      return DateFormat('dd/MM/yyyy').format(DateTime.parse(date.toString()));
-    } catch (e) {
-      return 'Date invalide';
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'APPROUVEE':
-        return Colors.green;
-      case 'REJETEE':
-        return Colors.red;
-      case 'EN_ATTENTE':
-      default:
-        return Colors.orange;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'APPROUVEE':
-        return 'Approuvée';
-      case 'REJETEE':
-        return 'Rejetée';
-      case 'EN_ATTENTE':
-      default:
-        return 'En attente';
-    }
-  }
-
-  String _formatType(String type) {
-    switch (type) {
-      case 'congé':
-        return 'Congé';
-      case 'absence':
-        return 'Absence';
-      case 'autorization_sortie':
-        return 'Autorisation de sortie';
-      default:
-        return type;
-    }
-  }
-
-  Widget _buildRequestItem(
-    String name, 
-    String type, 
-    String date, 
-    String status, 
-    Color statusColor
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.grey[50],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            child: Icon(Icons.person, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, 
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  )),
-                const SizedBox(height: 4),
-                Text(type, 
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  )),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(date, 
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                )),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withAlpha(26),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -576,31 +474,12 @@ class StatCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            FutureBuilder<int>(
-              future: RhService().getEmployesCount(),
-              builder: (context, employeCountSnapshot) {
-                if (employeCountSnapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox();
-                }
-                return FutureBuilder<int>(
-                  future: valueFuture,
-                  builder: (context, presentCountSnapshot) {
-                    if (presentCountSnapshot.connectionState == ConnectionState.waiting) {
-                      return const SizedBox();
-                    }
-                    final present = presentCountSnapshot.data ?? 0;
-                    final total = employeCountSnapshot.data ?? 1;
-                    final percentage = (present / total * 100).toStringAsFixed(1);
-                    return Text(
-                      '$percentage% attendance',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: color,
-                      ),
-                    );
-                  },
-                );
-              },
+            Text(
+              trend,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+              ),
             ),
           ],
         ),

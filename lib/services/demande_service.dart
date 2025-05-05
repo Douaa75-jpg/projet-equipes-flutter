@@ -225,4 +225,22 @@ Future<List<dynamic>> getUpcomingTeamLeaveRequests(String responsableId) async {
     throw Exception('Erreur réseau: $e');
   }
 }
+
+
+Future<List<dynamic>> getUpcomingLeaves() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/demande/conges/a-venir'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur réseau: $e');
+  }
+}
 }

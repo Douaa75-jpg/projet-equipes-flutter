@@ -3,8 +3,60 @@ import 'package:http/http.dart' as http;
 
 class EmployeService {
   final String baseUrl = 'http://localhost:3000/employes';
-
+  final String baseUrlUtilisateur = 'http://localhost:3000/utilisateurs';
   // Récupérer la liste des employés avec leurs responsables
+
+
+
+ Future<List<Employe>> getChefsEquipe() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrlUtilisateur/chefs-equipe'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((e) => Employe.fromChefJson(e)).toList();
+      } else {
+        throw Exception(
+            'Failed to load chefs d\'équipe: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur réseau: ${e.toString()}');
+    }
+  }
+
+
+ Future<void> assignerResponsable(String employeId, String? chefId) async {
+  try {
+    if (employeId.isEmpty) {
+      throw Exception('ID employé manquant');
+    }
+
+    final response = await http.patch(
+      Uri.parse('$baseUrlUtilisateur/$employeId/assigner-responsable'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'responsableId': chefId
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    } else if (response.statusCode == 404) {
+      throw Exception('Employé ou responsable non trouvé');
+    } else {
+      throw Exception(
+          'Échec de l\'assignation: ${response.statusCode} - ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur réseau: ${e.toString()}');
+  }
+}
+
+
+  
   Future<List<Employe>> getEmployees() async {
     final response = await http.get(Uri.parse(baseUrl));
 
@@ -67,7 +119,7 @@ class Employe {
   final String email;
   final String matricule;
   final String datedenaissance;
-  final Responsable responsable;
+  final Responsable? responsable;
 
   Employe({
     required this.id,
@@ -76,12 +128,12 @@ class Employe {
     required this.email,
     required this.matricule,
     required this.datedenaissance,
-    required this.responsable,
+    this.responsable,
   });
 
   factory Employe.fromJson(Map<String, dynamic> json) {
     return Employe(
-       id: json['id'] ?? json['_id'] ?? '',
+      id: json['id'] ?? json['_id'] ?? '',
       nom: json['utilisateur']['nom'] ?? '',
       prenom: json['utilisateur']['prenom'] ?? '',
       email: json['utilisateur']['email'] ?? '',
@@ -89,23 +141,37 @@ class Employe {
       datedenaissance: json['utilisateur']['datedenaissance'] ?? '',
       responsable: json['responsable'] != null
           ? Responsable.fromJson(json['responsable'])
-          : Responsable(nom: 'Inconnu', prenom: 'Inconnu'),
+          : null,
+    );
+  }
+
+  factory Employe.fromChefJson(Map<String, dynamic> json) {
+    return Employe(
+      id: json['id'] ?? '',
+      nom: json['nom'] ?? '',
+      prenom: json['prenom'] ?? '',
+      email: json['email'] ?? '',
+      matricule: json['matricule'] ?? '',
+      datedenaissance: json['datedenaissance']?.toString() ?? '',
+      responsable: null,
     );
   }
 }
 
-// Définition de la classe Responsable
 class Responsable {
+  final String id;
   final String nom;
   final String prenom;
 
   Responsable({
+    required this.id,
     required this.nom,
     required this.prenom,
   });
 
   factory Responsable.fromJson(Map<String, dynamic> json) {
     return Responsable(
+      id: json['_id'] ?? json['id'] ?? '',
       nom: json['utilisateur']['nom'] ?? 'Inconnu',
       prenom: json['utilisateur']['prenom'] ?? 'Inconnu',
     );

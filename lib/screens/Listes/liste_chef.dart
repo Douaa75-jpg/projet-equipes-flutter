@@ -293,7 +293,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
   Widget build(BuildContext context) {
     return RhLayout(
       title: 'Liste des Chefs d\'Équipe',
-      notificationService: widget.notificationService,
       child: Column(
         children: [
           Padding(

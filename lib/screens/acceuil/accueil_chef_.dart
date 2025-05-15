@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart'; 
-import '../../AuthProvider.dart';
+import '../../auth_controller.dart';
 import '../../services/notification_service.dart'; // Import ajouté
 import '../layoutt/chef_layout.dart';
 

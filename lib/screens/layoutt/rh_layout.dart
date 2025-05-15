@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import '../../AuthProvider.dart';
+import 'package:get/get.dart';
+import '../../auth_controller.dart';
 import '../acceuil/Accueil_RH.dart';
 import '../dashboard/rh_dashboard_screen.dart';
 import '../../services/notification_service.dart';
 import '../leave/gestion_demande__Screen.dart';
 import '../Listes/liste_employe.dart';
 import '../Listes/liste_chef.dart';
+import 'package:get_storage/get_storage.dart';
 
 class RhLayout extends StatefulWidget {
   final Widget child;
   final String title;
   final int pendingTasks;
-  final NotificationService? notificationService;
 
   const RhLayout({
     super.key,
     required this.child,
-    this.notificationService,
     this.title = 'Accueil',
     this.pendingTasks = 0,
   });
@@ -28,75 +27,190 @@ class RhLayout extends StatefulWidget {
 }
 
 class _RhLayoutState extends State<RhLayout> {
-  String _currentRoute = '/accueilRH';
-  bool _isDrawerOpen = false;
+  final NotificationService notificationService = Get.find<NotificationService>();
+  final AuthProvider authProvider = Get.find<AuthProvider>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GetStorage box = GetStorage();
 
   @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final nom = authProvider.nom ?? '';
-    final prenom = authProvider.prenom ?? '';
-    final isMobile = MediaQuery.of(context).size.width < 768;
+  void initState() {
+    super.initState();
+    authProvider.checkAuthStatus();
+    _setupNotificationListener();
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      drawer: isMobile ? _buildMobileDrawer(context) : null,
-      appBar: AppBar(
-        title: isMobile
-            ? Row(
-                children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 60,
-                    width: 60,
-                    fit: BoxFit.contain,
+  void _setupNotificationListener() {
+    notificationService.lastNotification.listen((message) {
+      if (message.isNotEmpty) {
+        Get.snackbar(
+          'notification'.tr,
+          message,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    });
+  }
+
+  String get _currentRoute => Get.currentRoute;
+
+  Widget _buildUserInfo({bool isMobile = false}) {
+    return Obx(() {
+      final displayName = (authProvider.prenom.value.isEmpty && authProvider.nom.value.isEmpty)
+          ? 'welcome'.tr
+          : '${authProvider.prenom.value} ${authProvider.nom.value}'.trim();
+
+      return Container(
+        padding: EdgeInsets.symmetric(
+          vertical: isMobile ? 6 : 8,
+          horizontal: isMobile ? 10 : 12,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'welcome'.tr,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: isMobile ? 10 : 12,
+                    fontWeight: FontWeight.w300,
                   ),
-                  const Spacer(),
-                  _buildUserInfo(prenom, nom, isMobile: true),
-                ],
-              )
-            : Row(
-                children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 125,
-                    width: 125,
-                    fit: BoxFit.contain,
-                  ),
-                  const Spacer(),
-                  _buildUserInfo(prenom, nom),
-                ],
-              ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.black),
-        toolbarHeight: isMobile ? 70 : 90,
-        actions: isMobile
-            ? [
-                IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {},
                 ),
-              ]
-            : null,
-      ),
-      body: Column(
-        children: [
-          if (!isMobile) _buildDesktopNavBar(context),
-          if (!isMobile)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.grey[100],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatusItem(
-                      Icons.update, 'Dernière MAJ: ${DateFormat('HH:mm').format(DateTime.now())}'),
-                  _buildStatusItem(Icons.cloud, 'Services: Online', isOnline: true),
-                ],
+                Text(
+                  displayName,
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: isMobile ? 12 : 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(width: isMobile ? 6 : 8),
+            Icon(
+              Icons.person_outline,
+              color: Colors.blue,
+              size: isMobile ? 20 : 24,
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildNotificationIcon({bool isMobile = false}) {
+    return Obx(() => Stack(
+      children: [
+        IconButton(
+          icon: Icon(
+            Icons.notifications,
+            size: isMobile ? 22 : 24,
+          ),
+          onPressed: _showNotificationsDialog,
+          tooltip: 'notifications'.tr,
+        ),
+        if (notificationService.unreadCount.value > 0)
+          Positioned(
+            right: isMobile ? 6 : 8,
+            top: isMobile ? 6 : 8,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                '${notificationService.unreadCount.value}',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isMobile ? 8 : 10,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
-          Expanded(child: widget.child),
+          ),
+      ],
+    ));
+  }
+
+  void _showNotificationsDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Text('notifications'.tr),
+        content: Obx(() {
+          if (notificationService.notifications.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('no_notifications'.tr),
+            );
+          }
+          return SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: notificationService.notifications.length,
+              itemBuilder: (context, index) {
+                final notification = notificationService.notifications[index];
+                return ListTile(
+                  leading: Icon(
+                    notification['type'] == 'rh_response' 
+                      ? Icons.work 
+                      : Icons.person,
+                    size: 20,
+                  ),
+                  title: Text(
+                    notification['message'],
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    DateFormat('dd/MM/yyyy HH:mm').format(
+                      DateTime.parse(notification['createdAt']),
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onTap: () {
+                    notificationService.markAsRead(notification['id']);
+                    if (notification['type'] == 'rh_response') {
+                      Get.to(() => GestionDemandeScreen());
+                    }
+                  },
+                );
+              },
+            ),
+          );
+        }),
+        actions: [
+          TextButton(
+            onPressed: () {
+              notificationService.markAllAsRead();
+              Get.back();
+            },
+            child: Text('mark_all_read'.tr),
+          ),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('close'.tr),
+          ),
         ],
       ),
     );
@@ -109,15 +223,16 @@ class _RhLayoutState extends State<RhLayout> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _buildNavItem(context, 'Accueil', '/accueilRH'),
-          _buildNavItem(context, 'Tableau de bord', '/dashboard'),
-          _buildNavItem(context, 'Employés', '/liste-employes'),
-          _buildNavItem(context, 'Chefs d\'équipe', '/liste-chefs'),
-          _buildNavItem(context, 'Toutes les Demandes', '/Notifications'),
+          _buildNavItem(context, 'accueil'.tr, '/accueilRH', _currentRoute == '/accueilRH'),
+          _buildNavItem(context, 'Tableau de bord'.tr, '/dashboard', _currentRoute == '/dashboard'),
+          _buildNavItem(context, 'employees'.tr, '/liste-employes', _currentRoute == '/liste-employes'),
+          _buildNavItem(context, 'chefs_équipe'.tr, '/liste-chefs', _currentRoute == '/liste-chefs'),
+          _buildNavItem(context, 'Toutes les demandes'.tr, '/Notifications', _currentRoute == '/Notifications'),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
+            icon: const Icon(Icons.search, color: Colors.white, size: 22),
             onPressed: () {},
+            tooltip: 'search'.tr,
           ),
           _buildMoreMenu(context),
         ],
@@ -145,146 +260,128 @@ class _RhLayoutState extends State<RhLayout> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Menu RH',
-                  style: TextStyle(
+                Obx(() => Text(
+                  '${authProvider.prenom.value} ${authProvider.nom.value}',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
-                ),
+                )),
               ],
             ),
           ),
-          _buildMobileNavItem(context, Icons.home, 'Accueil', '/accueilRH'),
-          _buildMobileNavItem(context, Icons.dashboard, 'Tableau de bord', '/dashboard'),
-          _buildMobileNavItem(context, Icons.people, 'Employés', '/liste-employes'),
-          _buildMobileNavItem(context, Icons.people_outline, 'Chefs d\'équipe', '/liste-chefs'),
-          _buildMobileNavItem(context, Icons.notifications, 'Toutes les Demandes', '/Notifications'),
+          _buildMobileNavItem(context, Icons.home, 'home'.tr, '/accueilRH'),
+          _buildMobileNavItem(context, Icons.dashboard, 'dashboard'.tr, '/dashboard'),
+          _buildMobileNavItem(context, Icons.people, 'employees'.tr, '/liste-employes'),
+          _buildMobileNavItem(context, Icons.people_outline, 'team_leaders'.tr, '/liste-chefs'),
+          _buildMobileNavItem(context, Icons.notifications, 'all_requests'.tr, '/Notifications'),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings),
-            title: const Text('Paramètres'),
-            onTap: () {},
-          ),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Aide'),
-            onTap: () {},
+            title: Text('settings'.tr),
+            onTap: () { 
+              Navigator.pop(context);
+              _showSettingsDialog(context);
+            },
           ),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Déconnexion', style: TextStyle(color: Colors.red)),
-            onTap: () => _showLogoutDialog(context),
+            title: Text('logout'.tr, style: const TextStyle(color: Colors.red)),
+            onTap: () => _showLogoutDialog(),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatusItem(Icons.update,
+                    'last_update'.trParams({'time': DateFormat('HH:mm').format(DateTime.now())})),
+                const SizedBox(height: 8),
+                _buildStatusItem(Icons.cloud, 'services_online'.tr, isOnline: true),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMobileNavItem(BuildContext context, IconData icon, String title, String route) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      onTap: () {
-        Navigator.pop(context); // Ferme le drawer
-        _navigateToRoute(context, route);
-      },
-    );
-  }
+  void _showSettingsDialog(BuildContext context) {
+    final currentLocale = Get.locale;
 
-  Widget _buildUserInfo(String prenom, String nom, {bool isMobile = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    Get.dialog(
+      AlertDialog(
+        title: Text('settings'.tr),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Bienvenue, ',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-              Text(
-                '$prenom $nom',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: isMobile ? 14 : 16,
-                  fontWeight: FontWeight.bold,
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: Text('language'.tr),
+                trailing: DropdownButton<Locale>(
+                  value: currentLocale,
+                  items: const [
+                    DropdownMenuItem(
+                      value: Locale('fr', 'FR'),
+                      child: Text('Français'),
+                    ),
+                    DropdownMenuItem(
+                      value: Locale('en', 'US'),
+                      child: Text('English'),
+                    ),
+                  ],
+                  onChanged: (Locale? newLocale) {
+                    if (newLocale != null) {
+                      Get.updateLocale(newLocale);
+                      box.write('locale', {
+                        'languageCode': newLocale.languageCode,
+                        'countryCode': newLocale.countryCode
+                      });
+                      Get.back();
+                      Get.snackbar(
+                        'success'.tr,
+                        'language_changed'.tr,
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    }
+                  },
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.person_outline, color: Colors.blue, size: 24),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('close'.tr),
+          ),
         ],
       ),
     );
   }
 
-  void _navigateToRoute(BuildContext context, String route) {
-    setState(() {
-      _currentRoute = route;
-    });
-
-    if (route == '/accueilRH') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AccueilRh()),
-      );
-    } else if (route == '/dashboard') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => RHDashboardScreen(
-            notificationService: widget.notificationService ?? NotificationService(),
+  Widget _buildStatusItem(IconData icon, String text, {bool isOnline = false}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: isOnline ? Colors.green : Colors.grey[700]),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[700],
           ),
         ),
-      );
-    } else if (route == '/liste-employes') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ListeEmployeScreen()),
-      );
-    } else if (route == '/liste-chefs') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ListeChefScreen(
-            notificationService: widget.notificationService ?? NotificationService(),
-          ),
-        ),
-      );
-    } else if (route == '/Notifications') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => GestionDemandeScreen()),
-      );
-    }
+      ],
+    );
   }
 
-  Widget _buildNavItem(BuildContext context, String title, String route) {
-    final isActive = _currentRoute == route;
-    
+  Widget _buildNavItem(BuildContext context, String title, String route, bool isActive) {
     return InkWell(
-      onTap: () => _navigateToRoute(context, route),
+      onTap: () => _navigateToRoute(route),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 15),
         child: Column(
@@ -310,51 +407,49 @@ class _RhLayoutState extends State<RhLayout> {
     );
   }
 
+  Widget _buildMobileNavItem(BuildContext context, IconData icon, String title, String route) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      onTap: () {
+        Navigator.pop(context);
+        _navigateToRoute(route);
+      },
+    );
+  }
+
   Widget _buildMoreMenu(BuildContext context) {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: Colors.white),
       onSelected: (value) {
         switch (value) {
-          case 'parametres':
-            // Navigation vers paramètres
+          case 'settings':
+            _showSettingsDialog(context);
             break;
-          case 'aides':
-            // Navigation vers aides
-            break;
-          case 'deconnexion':
-            _showLogoutDialog(context);
+          case 'logout':
+            _showLogoutDialog();
             break;
         }
       },
       itemBuilder: (BuildContext context) => [
-        const PopupMenuItem<String>(
-          value: 'parametres',
+        PopupMenuItem<String>(
+          value: 'settings',
           child: Row(
             children: [
-              Icon(Icons.settings, color: Colors.black54),
-              SizedBox(width: 8),
-              Text('Paramètres'),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'aide',
-          child: Row(
-            children: [
-              Icon(Icons.help_outline, color: Colors.black54),
-              SizedBox(width: 8),
-              Text('Aide'),
+              const Icon(Icons.settings, color: Colors.black54),
+              const SizedBox(width: 8),
+              Text('settings'.tr),
             ],
           ),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
-          value: 'deconnexion',
+          value: 'logout',
           child: Row(
             children: [
-              Icon(Icons.logout, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Déconnexion', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.logout, color: Colors.red),
+              const SizedBox(width: 8),
+              Text('logout'.tr, style: const TextStyle(color: Colors.red)),
             ],
           ),
         ),
@@ -362,44 +457,113 @@ class _RhLayoutState extends State<RhLayout> {
     );
   }
 
-  Widget _buildStatusItem(IconData icon, String text, {bool isOnline = false}) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: isOnline ? Colors.green : Colors.grey[700]),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[700],
+  void _navigateToRoute(String route) {
+    if (route == _currentRoute) return;
+    
+    switch (route) {
+      case '/accueilRH':
+        Get.offAll(() => const AccueilRh());
+        break;
+      case '/dashboard':
+        Get.offAll(() => RHDashboardScreen());
+        break;
+      case '/liste-employes':
+        Get.offAll(() =>  ListeEmployeScreen());
+        break;
+      case '/liste-chefs':
+        Get.offAll(() => ListeChefScreen(notificationService: notificationService));
+        break;
+      case '/Notifications':
+        Get.offAll(() => GestionDemandeScreen());
+        break;
+    }
+  }
+
+  void _showLogoutDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Text('confirm_logout'.tr),
+        content: Text('confirm_logout_message'.tr),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('cancel'.tr),
           ),
-        ),
-      ],
+          TextButton(
+            onPressed: () {
+              Get.back();
+              authProvider.logout();
+              Get.offAllNamed('/login');
+            },
+            child: Text('logout'.tr, style: const TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirmer la déconnexion'),
-          content: const Text('Voulez-vous vraiment vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        final isTablet = constraints.maxWidth < 1024;
+
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: Colors.white,
+          drawer: isMobile ? _buildMobileDrawer(context) : null,
+          appBar: AppBar(
+            leading: isMobile
+                ? IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                    tooltip: 'menu'.tr,
+                  )
+                : null,
+            title: Row(
+              children: [
+                Image.asset(
+                  'assets/logo.png',
+                  height: isMobile ? 40 : (isTablet ? 50 : 60),
+                  width: isMobile ? 40 : (isTablet ? 50 : 60),
+                  fit: BoxFit.contain,
+                ),
+                if (!isMobile) const Spacer(),
+                if (!isMobile) 
+                  Row(
+                    children: [
+                      _buildUserInfo(isMobile: isMobile),
+                      const SizedBox(width: 16),
+                      _buildStatusItem(Icons.cloud, 'services_online'.tr, isOnline: true),
+                    ],
+                  ),
+              ],
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                authProvider.logout();
-                Navigator.of(context).pushReplacementNamed('/login');
-              },
-              child: const Text('Déconnecter', style: TextStyle(color: Colors.red)),
-            ),
-          ],
+            backgroundColor: Colors.white,
+            elevation: 1,
+            iconTheme: const IconThemeData(color: Colors.black),
+            toolbarHeight: isMobile ? 60 : (isTablet ? 70 : 80),
+            actions: [
+              if (isMobile) ...[
+                _buildNotificationIcon(isMobile: true),
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () {},
+                  tooltip: 'search'.tr,
+                ),
+              ] else ...[
+                _buildNotificationIcon(isMobile: false),
+                _buildMoreMenu(context),
+              ],
+            ],
+          ),
+          body: Column(
+            children: [
+              if (!isMobile) _buildDesktopNavBar(context),
+              Expanded(child: widget.child),
+            ],
+          ),
         );
       },
     );

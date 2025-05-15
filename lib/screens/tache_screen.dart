@@ -31,13 +31,7 @@ class _TacheScreenState extends State<TacheScreen> {
   }
 
   void _initializeNotifications() {
-    _notificationService.connect(widget.employeId, (message) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.green),
-        );
-      }
-    });
+   
   }
 
   Future<void> _fetchTaches() async {
@@ -324,7 +318,6 @@ class _TacheScreenState extends State<TacheScreen> {
   Widget build(BuildContext context) {
     return EmployeeLayout(
       title: 'Mes Tâches',
-      notificationService: _notificationService,
       child: Column(
         children: [
           Padding(
@@ -434,7 +427,6 @@ class _TacheScreenState extends State<TacheScreen> {
 
   @override
   void dispose() {
-    _notificationService.dispose();
     _titreController.dispose();
     _descriptionController.dispose();
     _dateLimiteController.dispose();

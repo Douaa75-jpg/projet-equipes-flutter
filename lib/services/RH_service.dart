@@ -1,131 +1,188 @@
 import 'dart:convert';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
-class RhService {
+class RhService extends GetxService {
   final String baseUrl = 'http://localhost:3000/utilisateurs';
-  final String baseUrlEmployes =
-      'http://localhost:3000/employes'; // Cette ligne est correcte
+  final String baseUrlEmployes = 'http://localhost:3000/employes';
   final String baseUrlResponsables = 'http://localhost:3000/responsables';
 
-  // Fonction pour obtenir le nombre d'employés
+  // Reactive variables
+  final RxList<Employe> employees = <Employe>[].obs;
+  final RxList<Responsable> responsables = <Responsable>[].obs;
+  final RxInt employesCount = 0.obs;
+  final RxInt responsablesCount = 0.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Initialize data when service is created
+    fetchInitialData();
+  }
+
+  Future<void> fetchInitialData() async {
+    await getEmployesCount();
+    await getResponsablesCount();
+    await getEmployees();
+    await getResponsables();
+  }
+
+  // Get employees count (reactive)
   Future<int> getEmployesCount() async {
-    final response = await http.get(Uri.parse('$baseUrl/count/employes'));
-
+  try {
+    final response = await http.get(Uri.parse('$baseUrl/count/employes'))
+      .timeout(const Duration(seconds: 10));
+    
     if (response.statusCode == 200) {
-      var data = json.decode(response.body);
-      return data['totalEmployes'];
+      final data = json.decode(response.body);
+      employesCount.value = data['totalEmployes'] ?? 0;
+      return employesCount.value;
     } else {
-      throw Exception('Échec de récupération des employés');
+      throw Exception('Failed to load employees count: ${response.statusCode}');
     }
+  } catch (e) {
+    debugPrint('Error in getEmployesCount: $e');
+    Get.snackbar('Error', 'Failed to fetch employees count');
+    return 0; // Return default value
   }
+}
 
-  // Fonction pour obtenir le nombre de responsables (chefs d'équipe)
+  // Get responsables count (reactive)
   Future<int> getResponsablesCount() async {
-    final response = await http.get(Uri.parse('$baseUrl/count/responsables'));
-
-    if (response.statusCode == 200) {
-      var data = json.decode(response.body);
-      return data['totalResponsables'];
-    } else {
-      throw Exception('Échec de récupération des responsables');
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/count/responsables'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        responsablesCount.value = data['totalResponsables'];
+        return responsablesCount.value;
+      } else {
+        throw Exception('Failed to load responsables count');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to fetch responsables count: $e');
+      rethrow;
     }
   }
 
-  // Fonction pour obtenir la liste des responsables
+  // Get all responsables (reactive)
   Future<List<Responsable>> getResponsables() async {
-    final response = await http.get(Uri.parse('$baseUrlResponsables'));
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((item) => Responsable.fromJson(item)).toList();
-    } else {
-      throw Exception('Échec de récupération des responsables');
+    try {
+      final response = await http.get(Uri.parse(baseUrlResponsables));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        responsables.assignAll(data.map((item) => Responsable.fromJson(item)).toList());
+        return responsables;
+      } else {
+        throw Exception('Failed to load responsables');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to fetch responsables: $e');
+      rethrow;
     }
   }
 
-  // Fonction pour obtenir la liste des employés avec leurs responsables
+  // Get all employees (reactive)
   Future<List<Employe>> getEmployees() async {
-    final response = await http.get(Uri.parse(
-        baseUrlEmployes)); // Ici, la variable 'baseUrlEmployes' est utilisée correctement.
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((item) => Employe.fromJson(item)).toList();
-    } else {
-      throw Exception('Échec de récupération des employés');
+    try {
+      final response = await http.get(Uri.parse(baseUrlEmployes));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        employees.assignAll(data.map((item) => Employe.fromJson(item)).toList());
+        return employees;
+      } else {
+        throw Exception('Failed to load employees');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to fetch employees: $e');
+      rethrow;
     }
   }
 
-  // Méthode pour mettre à jour un employé
-  Future<Map<String, dynamic>> updateEmployee(
-      String id, Map<String, dynamic> updateData) async {
-    final url = Uri.parse('$baseUrlEmployes/$id');
-    final response = await http.put(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(updateData),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur lors de la mise à jour de l\'employé');
+  // Update employee
+  Future<void> updateEmployee(String id, Map<String, dynamic> updateData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrlEmployes/$id'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(updateData),
+      );
+      if (response.statusCode == 200) {
+        Get.snackbar('Success', 'Employee updated successfully');
+        await getEmployees(); // Refresh list
+      } else {
+        throw Exception('Failed to update employee');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update employee: $e');
+      rethrow;
     }
   }
 
-  // Méthode pour supprimer un employé
-  Future<Map<String, dynamic>> deleteEmployee(String id) async {
-    final url = Uri.parse('$baseUrlEmployes/$id');
-    final response = await http.delete(url);
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur lors de la suppression de l\'employé');
+  // Delete employee
+  Future<void> deleteEmployee(String id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrlEmployes/$id'));
+      if (response.statusCode == 200) {
+        Get.snackbar('Success', 'Employee deleted successfully');
+        await getEmployees(); // Refresh list
+      } else {
+        throw Exception('Failed to delete employee');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete employee: $e');
+      rethrow;
     }
   }
 
-  // Méthode pour mettre à jour un responsable
-  Future<Map<String, dynamic>> updateResponsable(
-      String id, Map<String, dynamic> updateData) async {
-    // Structurer les données comme attendu par le backend
-    final dataToSend = {
-      "nom": updateData["nom"],
-      "prenom": updateData["prenom"],
-      "email": updateData["email"],
-      "typeResponsable": updateData["typeResponsable"],
-      "matricule": updateData["matricule"],
-      "datedenaissance": updateData["datedenaissance"],
-    };
+  // Update responsable
+  Future<void> updateResponsable(String id, Map<String, dynamic> updateData) async {
+    try {
+      final dataToSend = {
+        "nom": updateData["nom"],
+        "prenom": updateData["prenom"],
+        "email": updateData["email"],
+        "typeResponsable": updateData["typeResponsable"],
+        "matricule": updateData["matricule"],
+        "datedenaissance": updateData["datedenaissance"],
+      };
 
-    final response = await http.put(
-      Uri.parse('$baseUrlResponsables/$id'),
-      headers: {"Content-Type": "application/json"},
-      body: json.encode(dataToSend),
-    );
+      final response = await http.put(
+        Uri.parse('$baseUrlResponsables/$id'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(dataToSend),
+      );
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception(
-          'Erreur lors de la mise à jour du responsable: ${response.body}');
+      if (response.statusCode == 200) {
+        Get.snackbar('Success', 'Responsable updated successfully');
+        await getResponsables(); // Refresh list
+      } else {
+        throw Exception('Failed to update responsable: ${response.body}');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update responsable: $e');
+      rethrow;
     }
   }
 
-  // Méthode pour supprimer un responsable
-  Future<Map<String, dynamic>> deleteResponsable(String id) async {
-    final url = Uri.parse('$baseUrlResponsables/$id');
-    final response = await http.delete(url);
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur lors de la suppression du responsable');
+  // Delete responsable
+  Future<void> deleteResponsable(String id) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrlResponsables/$id'));
+      if (response.statusCode == 200) {
+        Get.snackbar('Success', 'Responsable deleted successfully');
+        await getResponsables(); // Refresh list
+      } else {
+        throw Exception('Failed to delete responsable');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete responsable: $e');
+      rethrow;
     }
   }
 }
 
-// Définition de la classe Responsable
+// Models (unchanged)
 class Responsable {
   final String id;
   final String nom;
@@ -158,7 +215,6 @@ class Responsable {
   }
 }
 
-// Définition de la classe Employe
 class Employe {
   final String id;
   final String nom;

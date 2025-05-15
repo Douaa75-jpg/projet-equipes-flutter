@@ -1,45 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:get/get.dart';
 import 'package:gestion_equipe_flutter/services/auth_service.dart';
 import 'package:gestion_equipe_flutter/screens/acceuil/accueil_chef_.dart';
 import 'package:gestion_equipe_flutter/screens/dashboard/admin_dashboard_screen.dart';
-import 'package:gestion_equipe_flutter/AuthProvider.dart';
 import 'package:gestion_equipe_flutter/screens/auth/reset_password_screen.dart';
 import 'package:gestion_equipe_flutter/screens/auth/forgot_password_screen.dart';
 import 'package:gestion_equipe_flutter/screens/acceuil/accueil_employe.dart';
 import '../auth/registre_screen.dart';
 import '../acceuil/Accueil_RH.dart';
+import '../../auth_controller.dart';
 
 enum TypeResponsable { chefEquipe, rh }
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+class LoginController extends GetxController {
+  final AuthService authService = Get.put(AuthService());
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  var isLoading = false.obs;
+  var isPasswordVisible = false.obs;
+  final formKey = GlobalKey<FormState>();
 
-  @override
-  _LoginScreenState createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _isPasswordVisible = false;
-  final _formKey = GlobalKey<FormState>();
-
-  // Fonction de validation de l'email
-  String? _validateEmail(String? value) {
+  String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Veuillez entrer votre email';
     }
-    final emailRegExp = RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+    final emailRegExp =
+        RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
     if (!emailRegExp.hasMatch(value)) {
       return 'Veuillez entrer un email valide';
     }
     return null;
   }
 
-  // Fonction de validation du mot de passe
-  String? _validatePassword(String? value) {
+  String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Veuillez entrer votre mot de passe';
     }
@@ -49,61 +42,57 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> login() async {
+    if (!formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    isLoading.value = true;
 
     try {
-      // Utilisation du AuthProvider pour se connecter
-      var data = await Provider.of<AuthProvider>(context, listen: false)
-          .login(_emailController.text, _passwordController.text);
+      final authService = Get.find<AuthService>();
+      var data = await authService.login(
+          emailController.text, passwordController.text);
 
-      if (!mounted) return;
+      Get.snackbar(
+        'Succès',
+        'Connexion réussie!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Connexion réussie!')));
+      final authProvider = Get.find<AuthProvider>();
+      await authProvider.checkAuthStatus();
 
-      // Récupérer le rôle et le sous-rôle du JWT ou des données renvoyées
       String role = data['role'] ?? '';
       String subRole = data['typeResponsable'] ?? '';
 
-      // Redirection en fonction du rôle
       if (role == 'EMPLOYE') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AccueilEmploye()),
-        );
+        Get.offAll(() => const AccueilEmploye());
       } else if (role == 'RESPONSABLE') {
-        _handleResponsableNavigation(subRole);
+        handleResponsableNavigation(subRole);
       } else if (role == 'ADMINISTRATEUR') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) =>  AdminDashboardScreen()),
-        );
+        Get.offAll(() => AdminDashboardScreen());
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rôle non défini: $role')),
+        Get.snackbar(
+          'Erreur',
+          'Rôle non défini: $role',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
         );
       }
     } catch (e) {
-      if (!mounted) return;
-      _handleLoginError(e);
+      handleLoginError(e);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      isLoading.value = false;
     }
   }
 
-  void _handleResponsableNavigation(String subRole) {
+  void handleResponsableNavigation(String subRole) {
     if (subRole.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sous-rôle de responsable non défini')),
+      Get.snackbar(
+        'Erreur',
+        'Sous-rôle de responsable non défini',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
       return;
     }
@@ -118,41 +107,64 @@ class _LoginScreenState extends State<LoginScreen> {
     if (responsableType != null) {
       switch (responsableType) {
         case TypeResponsable.chefEquipe:
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const Accueilchef()),
-          );
+          Get.offAll(() => const Accueilchef());
           break;
         case TypeResponsable.rh:
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) =>  AccueilRh()),
-          );
+          Get.offAll(() => AccueilRh());
           break;
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sous-rôle de responsable non défini: $subRole')),
+      Get.snackbar(
+        'Erreur',
+        'Sous-rôle de responsable non défini: $subRole',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
     }
   }
 
-  void _handleLoginError(dynamic e) {
-    String errorMessage = e.toString();
-    
-    if (errorMessage.contains("invalid email") || 
-        errorMessage.contains("invalid password")) {
+  void handleLoginError(dynamic e) {
+    String errorMessage;
+
+    if (e.toString().contains("Email incorrect")) {
+      errorMessage =
+          "L'email que vous avez entré est incorrect. Veuillez vérifier et réessayer.";
+    } else if (e.toString().contains("Mot de passe incorrect")) {
+      errorMessage =
+          "Le mot de passe que vous avez entré est incorrect. Veuillez réessayer.";
+    } else if (e.toString().contains("invalid email") ||
+        e.toString().contains("invalid password")) {
       errorMessage = "Email ou mot de passe incorrect.";
-    } else if (errorMessage.contains("Unauthorized")) {
-      errorMessage = "Échec de l'authentification. Veuillez vérifier vos informations.";
-    } else if (errorMessage.contains("timeout") || errorMessage.contains("socket")) {
+    } else if (e.toString().contains("Unauthorized")) {
+      errorMessage =
+          "Email ou mot de passe incorrect. Veuillez vérifier vos informations.";
+    } else if (e.toString().contains("timeout") ||
+        e.toString().contains("socket")) {
       errorMessage = "Problème de connexion. Vérifiez votre accès internet.";
+    } else {
+      errorMessage =
+          "Une erreur s'est produite lors de la connexion. Veuillez réessayer.";
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Erreur: $errorMessage')),
+    Get.snackbar(
+      'Erreur',
+      errorMessage,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 5),
     );
   }
+
+  void togglePasswordVisibility() {
+    isPasswordVisible.value = !isPasswordVisible.value;
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  final LoginController controller = Get.put(LoginController());
+
+  LoginScreen({Key? key}) : super(key: key);
 
   Widget _buildTextField({
     required String label,
@@ -160,10 +172,14 @@ class _LoginScreenState extends State<LoginScreen> {
     bool obscure = false,
     Widget? suffixIcon,
     String? Function(String?)? validator,
+    TextInputAction? textInputAction,
+    void Function(String)? onFieldSubmitted,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onFieldSubmitted,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.black54),
@@ -178,106 +194,121 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(BuildContext context, bool isSmallScreen) {
     return Form(
-      key: _formKey,
+      key: controller.formKey,
       child: Column(
         children: [
-          // Logo
           Image.asset(
             'assets/logo.png',
-            height: 100,
+            height: isSmallScreen ? 100 : 120,
           ),
-          const SizedBox(height: 24),
-          const Text(
+          SizedBox(height: isSmallScreen ? 16 : 24),
+          Text(
             'Bienvenue',
             style: TextStyle(
-              fontSize: 28, 
-              fontWeight: FontWeight.bold, 
-              color: Color(0xFFD32F2F),
+              fontSize: isSmallScreen ? 28 : 32,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFD32F2F),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: isSmallScreen ? 8 : 12),
+          Text(
             'Connectez-vous à votre compte',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: TextStyle(
+              fontSize: isSmallScreen ? 16 : 18,
+              color: Colors.grey,
+            ),
           ),
-          const SizedBox(height: 32),
-
-          // Champ Email
+          SizedBox(height: isSmallScreen ? 24 : 32),
           _buildTextField(
             label: 'Email',
-            controller: _emailController,
-            validator: _validateEmail,
+            controller: controller.emailController,
+            validator: controller.validateEmail,
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
           ),
-          const SizedBox(height: 20),
-
-          // Champ Mot de passe
-          _buildTextField(
-            label: 'Mot de passe',
-            controller: _passwordController,
-            obscure: !_isPasswordVisible,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                color: Colors.grey,
-              ),
-              onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
-            ),
-            validator: _validatePassword,
-          ),
-
-          const SizedBox(height: 12),
-          // Lien Mot de passe oublié
+          SizedBox(height: isSmallScreen ? 16 : 20),
+          Obx(() => _buildTextField(
+                label: 'Mot de passe',
+                controller: controller.passwordController,
+                obscure: !controller.isPasswordVisible.value,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => controller.login(),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    controller.isPasswordVisible.value
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                    color: Colors.grey,
+                  ),
+                  onPressed: controller.togglePasswordVisibility,
+                ),
+                validator: controller.validatePassword,
+              )),
+          SizedBox(height: isSmallScreen ? 12 : 16),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ForgotPasswordScreen(),
-                  ),
-                );
-              },
+              onPressed: () => Get.to(() => ForgotPasswordScreen()),
               child: const Text(
                 'Mot de passe oublié ?',
                 style: TextStyle(color: Color(0xFFD32F2F)),
               ),
             ),
           ),
-
-          const SizedBox(height: 24),
-          // Bouton de connexion
-          ElevatedButton(
-            onPressed: _isLoading ? null : _login,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: const Color(0xFFD32F2F),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-              elevation: 4,
-            ),
-            child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Se connecter', 
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+          SizedBox(height: isSmallScreen ? 16 : 24),
+          Obx(() => SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: controller.isLoading.value ? null : controller.login,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      vertical: isSmallScreen ? 14 : 16,
+                    ),
+                    backgroundColor: const Color(0xFFD32F2F),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 4,
                   ),
-          ),
-          const SizedBox(height: 16),
-          // Lien vers l'inscription
+                  child: controller.isLoading.value
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          'Se connecter',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 18 : 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              )),
+          SizedBox(height: isSmallScreen ? 12 : 16),
           TextButton(
-            onPressed: () {
-              Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (_) =>  RegisterPage()),
-              );
-            },
-            child: const Text(
-              "Vous n'avez pas de compte ? Créer un compte",
-              style: TextStyle(color: Color(0xFFD32F2F)),
+            onPressed: null,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: "Vous n'avez pas de compte ? ",
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                    ),
+                  ),
+                  WidgetSpan(
+                    child: InkWell(
+                      onTap: () => Get.to(() => RegisterPage()),
+                      child: Text(
+                        "Créer un compte",
+                        style: TextStyle(
+                          color: const Color(0xFFD32F2F),
+                          fontSize: isSmallScreen ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -287,23 +318,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 600;
+    final isLargeScreen = screenWidth >= 1200;
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 249, 239, 241),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: isSmallScreen ? 400 : (isLargeScreen ? 500 : 450),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: isMobile ? 400 : 500),
-                child: _buildForm(context),
+            child: Card(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 24 : 32),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(isSmallScreen ? 20 : 32),
+                child: _buildForm(context, isSmallScreen),
               ),
             ),
           ),

@@ -1,51 +1,138 @@
-import 'dart:async';
+import 'package:get/get.dart';
+import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
+import 'package:get_storage/get_storage.dart';
+import '../screens/leave/gestion_demande__Screen.dart';
 
+class NotificationService extends GetxService {
+  final RxList<Map<String, dynamic>> notifications = <Map<String, dynamic>>[].obs;
+  final RxInt unreadCount = 0.obs;
+  final RxString lastNotification = ''.obs;
+  final _storageKey = 'local_notifications';
+  final GetStorage _storage = GetStorage();
 
-class NotificationService {
-  final StreamController<List<Map<String, dynamic>>> _notificationsController = 
-      StreamController<List<Map<String, dynamic>>>.broadcast();
-  
-  List<Map<String, dynamic>> _notifications = [];
-  StreamSubscription? _subscription;
-
-  Stream<List<Map<String, dynamic>>> get notifications => _notificationsController.stream;
-
-  void addNotification(Map<String, dynamic> notification) {
-    _notifications.insert(0, {
-      ...notification,
-      'time': DateTime.now().toString(),
-      'read': false,
-    });
-    _notificationsController.add([..._notifications]);
+  @override
+  void onInit() {
+    super.onInit();
+    _loadFromLocalStorage();
   }
 
-  void markAsRead(int index) {
-    if (index >= 0 && index < _notifications.length) {
-      _notifications[index]['read'] = true;
-      _notificationsController.add([..._notifications]);
+  void setupListeners() {
+    debugPrint('Notification listeners initialized');
+  }
+
+  void _loadFromLocalStorage() {
+    try {
+      final saved = _storage.read<List>(_storageKey);
+      if (saved != null) {
+        notifications.assignAll(saved.cast<Map<String, dynamic>>());
+        unreadCount.value = notifications.where((n) => !n['read']).length;
+      }
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
     }
   }
-  
 
-  void connect(String userId, void Function(String) onNotification) {
-    // Simulation de notifications - à remplacer par un vrai service
-    _subscription = Stream.periodic(const Duration(seconds: 30)).listen((_) {
-      final notification = {
-        'title': 'Nouvelle notification',
-        'message': 'Mise à jour du système - ${DateTime.now().hour}:${DateTime.now().minute}',
-      };
-      addNotification(notification);
-      onNotification(notification['message'] ?? 'Nouvelle notification'); // Correction ici
-    });
+  void _saveToLocalStorage() {
+    try {
+      _storage.write(_storageKey, notifications.toList());
+    } catch (e) {
+      debugPrint('Error saving notifications: $e');
+    }
   }
 
-  void disconnect() {
-    _subscription?.cancel();
-    _subscription = null;
+  void addEmployeeNotification(String message, {String? demandeId}) {
+    final newNotif = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'message': message,
+      'type': 'employee_response',
+      'demandeId': demandeId,
+      'createdAt': DateTime.now().toIso8601String(),
+      'read': false,
+    };
+    _addNotification(newNotif, Colors.green);
   }
 
-  void dispose() {
-    disconnect();
-    _notificationsController.close();
+  void addRHNotification(String message, {String? demandeId, Function()? onTap}) {
+    final newNotif = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'message': message,
+      'type': 'new_request',
+      'demandeId': demandeId,
+      'onTap': onTap,
+      'createdAt': DateTime.now().toIso8601String(),
+      'read': false,
+    };
+    _addNotification(newNotif, Colors.blue);
+  }
+
+  void _addNotification(Map<String, dynamic> notification, Color bgColor) {
+    notifications.insert(0, notification);
+    unreadCount.value++;
+    lastNotification.value = notification['message'];
+    _vibrate();
+    _showSnackbar(notification, bgColor);
+    _saveToLocalStorage();
+  }
+
+  Future<void> _vibrate() async {
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 200);
+    }
+  }
+
+  void _showSnackbar(Map<String, dynamic> notification, Color bgColor) {
+    Get.snackbar(
+      notification['type'] == 'new_request' ? 'Nouvelle demande' : 'Notification',
+      notification['message'],
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: bgColor,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+      onTap: (_) {
+        if (notification['onTap'] != null) {
+          notification['onTap']();
+        } else if (notification['type'] == 'new_request') {
+          navigateToDemandeScreen(notification['id']);
+        }
+      },
+    );
+  }
+
+  void navigateToDemandeScreen(String demandeId) {
+  final controller = Get.find<GestionDemandeController>(tag: 'demande');
+  Get.to(() => GestionDemandeScreen());
+}
+
+  void markAsRead(String id) {
+    final index = notifications.indexWhere((n) => n['id'] == id);
+    if (index != -1 && !notifications[index]['read']) {
+      notifications[index]['read'] = true;
+      unreadCount.value--;
+      _saveToLocalStorage();
+    }
+  }
+
+  void markAllAsRead() {
+    for (var notif in notifications) {
+      if (!notif['read']) {
+        notif['read'] = true;
+      }
+    }
+    unreadCount.value = 0;
+    _saveToLocalStorage();
+  }
+
+  void clearAll() {
+    notifications.clear();
+    unreadCount.value = 0;
+    lastNotification.value = '';
+    _saveToLocalStorage();
+  }
+
+  @override
+  void onClose() {
+    _saveToLocalStorage();
+    super.onClose();
   }
 }

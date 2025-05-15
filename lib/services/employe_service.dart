@@ -1,15 +1,71 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:get/get.dart';
 
-class EmployeService {
+class EmployeService extends GetxController {
   final String baseUrl = 'http://localhost:3000/employes';
   final String baseUrlUtilisateur = 'http://localhost:3000/utilisateurs';
+
+  var employees = <Employe>[].obs;
+  var chefsEquipe = <Employe>[].obs;
+  var isLoading = false.obs;
+  var errorMessage = ''.obs;
+
+
+  // في Employe_Service.dart
+Future<Map<String, dynamic>> calculerEtMettreAJourAbsences(String employeId) async {
+  try {
+    isLoading(true);
+    errorMessage('');
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/$employeId/calculate-absences'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final result = json.decode(response.body);
+      return result;
+    } else if (response.statusCode == 404) {
+      throw Exception('Employé non trouvé');
+    } else if (response.statusCode == 500) {
+      throw Exception('Erreur serveur lors du calcul des absences');
+    } else {
+      throw Exception('Erreur inattendue: ${response.statusCode}');
+    }
+  } catch (e) {
+    errorMessage('Erreur lors du calcul des absences: $e');
+    rethrow;
+  } finally {
+    isLoading(false);
+  }
+}
+
   // Récupérer la liste des employés avec leurs responsables
-
-
-
- Future<List<Employe>> getChefsEquipe() async {
+  Future<void> fetchEmployees() async {
     try {
+      isLoading(true);
+      errorMessage('');
+      final response = await http.get(Uri.parse(baseUrl));
+
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        employees.assignAll(data.map((item) => Employe.fromJson(item)).toList());
+      } else {
+        throw Exception('Échec de récupération des employés');
+      }
+    } catch (e) {
+      errorMessage(e.toString());
+    } finally {
+      isLoading(false);
+    }
+  }
+
+  // Récupérer la liste des chefs d'équipe
+  Future<void> fetchChefsEquipe() async {
+    try {
+      isLoading(true);
+      errorMessage('');
       final response = await http.get(
         Uri.parse('$baseUrlUtilisateur/chefs-equipe'),
         headers: {'Content-Type': 'application/json'},
@@ -17,99 +73,110 @@ class EmployeService {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        return data.map((e) => Employe.fromChefJson(e)).toList();
+        chefsEquipe.assignAll(data.map((e) => Employe.fromChefJson(e)).toList());
       } else {
         throw Exception(
             'Failed to load chefs d\'équipe: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      throw Exception('Erreur réseau: ${e.toString()}');
+      errorMessage(e.toString());
+    } finally {
+      isLoading(false);
     }
   }
 
+  // Assigner un responsable à un employé
+  Future<void> assignerResponsable(String employeId, String? chefId) async {
+    try {
+      isLoading(true);
+      errorMessage('');
+      
+      if (employeId.isEmpty) {
+        throw Exception('ID employé manquant');
+      }
 
- Future<void> assignerResponsable(String employeId, String? chefId) async {
-  try {
-    if (employeId.isEmpty) {
-      throw Exception('ID employé manquant');
+      final response = await http.patch(
+        Uri.parse('$baseUrlUtilisateur/$employeId/assigner-responsable'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'responsableId': chefId}),
+      );
+
+      if (response.statusCode == 200) {
+        // Rafraîchir la liste des employés après modification
+        await fetchEmployees();
+      } else if (response.statusCode == 404) {
+        throw Exception('Employé ou responsable non trouvé');
+      } else {
+        throw Exception(
+            'Échec de l\'assignation: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      errorMessage(e.toString());
+    } finally {
+      isLoading(false);
     }
+  }
 
-    final response = await http.patch(
-      Uri.parse('$baseUrlUtilisateur/$employeId/assigner-responsable'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'responsableId': chefId
-      }),
-    );
+  // Supprimer un employé
+  Future<void> deleteEmployee(String id) async {
+    try {
+      isLoading(true);
+      errorMessage('');
+      final response = await http.delete(
+        Uri.parse('$baseUrl/$id'),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-    if (response.statusCode == 200) {
-      return;
-    } else if (response.statusCode == 404) {
-      throw Exception('Employé ou responsable non trouvé');
-    } else {
-      throw Exception(
-          'Échec de l\'assignation: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        // Retirer l'employé de la liste observable
+        employees.removeWhere((employe) => employe.id == id);
+      } else if (response.statusCode == 404) {
+        throw Exception('Employé non trouvé');
+      } else if (response.statusCode == 500) {
+        throw Exception('Erreur interne du serveur');
+      } else {
+        throw Exception('Échec de la suppression de l\'employé: ${response.statusCode}');
+      }
+    } catch (e) {
+      errorMessage(e.toString());
+    } finally {
+      isLoading(false);
     }
-  } catch (e) {
-    throw Exception('Erreur réseau: ${e.toString()}');
+  }
+
+  // Mettre à jour un employé
+  Future<void> updateEmployee(String id, Map<String, dynamic> updateData) async {
+    try {
+      isLoading(true);
+      errorMessage('');
+      
+      if (updateData['dateDeNaissance'] != null && updateData['dateDeNaissance'] is DateTime) {
+        updateData['dateDeNaissance'] = updateData['dateDeNaissance'].toIso8601String();
+      }
+      
+      final response = await http.patch(
+        Uri.parse('$baseUrl/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(updateData),
+      );
+
+      if (response.statusCode == 200) {
+        // Rafraîchir la liste des employés après modification
+        await fetchEmployees();
+      } else if (response.statusCode == 404) {
+        throw Exception('Employé non trouvé');
+      } else if (response.statusCode == 400) {
+        throw Exception('Données invalides: ${response.body}');
+      } else {
+        throw Exception('Échec de la mise à jour: ${response.statusCode}');
+      }
+    } catch (e) {
+      errorMessage(e.toString());
+    } finally {
+      isLoading(false);
+    }
   }
 }
-
-
-  
-  Future<List<Employe>> getEmployees() async {
-    final response = await http.get(Uri.parse(baseUrl));
-
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((item) => Employe.fromJson(item)).toList();
-    } else {
-      throw Exception('Échec de récupération des employés');
-    }
-  }
-
-   // ✅ supprimer employe
-  Future<bool> deleteEmployee(String id) async {
-  final response = await http.delete(
-    Uri.parse('$baseUrl/$id'),
-    headers: {'Content-Type': 'application/json'},
-  );
-
-  if (response.statusCode == 200) {
-    return true;
-  } else if (response.statusCode == 404) {
-    throw Exception('Employé non trouvé');
-  } else if (response.statusCode == 500) {
-    throw Exception('Erreur interne du serveur');
-  } else {
-    throw Exception('Échec de la suppression de l\'employé: ${response.statusCode}');
-  }
-}
- // ✅ Mettre à jour un employé
-  Future<Employe> updateEmployee(String id, Map<String, dynamic> updateData) async {
-     if (updateData['dateDeNaissance'] != null && updateData['dateDeNaissance'] is DateTime) {
-    updateData['dateDeNaissance'] = updateData['dateDeNaissance'].toIso8601String();
-    }
-    final response = await http.patch(
-      Uri.parse('$baseUrl/$id'),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: json.encode(updateData),
-    );
-
-    if (response.statusCode == 200) {
-      return Employe.fromJson(json.decode(response.body));
-    } else if (response.statusCode == 404) {
-      throw Exception('Employé non trouvé');
-    } else if (response.statusCode == 400) {
-      throw Exception('Données invalides: ${response.body}');
-    } else {
-      throw Exception('Échec de la mise à jour: ${response.statusCode}');
-    }
-  }
-}
-
 
 // Définition de la classe Employe
 class Employe {

@@ -1,133 +1,351 @@
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
+class PointageService extends GetxService {
+  final String baseUrl = 'http://localhost:3000/pointages';
+  final String timezone = 'Africa/Tunis';
 
-class PointageService {
-  final String baseUrl = 'http://localhost:3000/pointages'; // URL de votre backend NestJS
+  // Headers communs
+  Map<String, String> get _headers => {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+  };
 
-  // Enregistrer un pointage (entrée/sortie automatique)
   Future<Map<String, dynamic>> enregistrerPointage(String employeId) async {
-    print('Enregistrement pointage pour employé: $employeId');
-    
-    final response = await http.post(
-      Uri.parse('$baseUrl/$employeId'),
-      headers: {"Content-Type": "application/json"},
-    );
-    
-    print('Réponse API enregistrerPointage : ${response.body}');
-    
-    if (response.statusCode == 201) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur lors de l\'enregistrement du pointage');
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/$employeId'),
+        headers: _headers,
+      );
+
+      debugPrint('Pointage Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in enregistrerPointage: $e');
+      rethrow;
     }
   }
 
-  // Calculer les heures travaillées
   Future<Map<String, dynamic>> calculerHeuresTravail(
     String employeId, 
     String dateDebut, 
     String dateFin
   ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/heures-travail/$employeId?dateDebut=$dateDebut&dateFin=$dateFin'),
-    );
-    
-    print('Réponse API calculerHeuresTravail : ${response.body}');
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/heures-travail/$employeId?dateDebut=$dateDebut&dateFin=$dateFin'
+      );
+      
+      final response = await http.get(uri, headers: _headers);
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur lors du calcul des heures de travail');
+      debugPrint('Heures Travail Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in calculerHeuresTravail: $e');
+      return {
+        'totalHeures': 0,
+        'totalHeuresFormatted': '0h 0min',
+        'heuresParJour': {}
+      };
     }
   }
 
-  // Obtenir l'historique des pointages
- Future<List<dynamic>> getHistorique(String employeId, String date) async {
+  Future<List<dynamic>> getHistorique(String employeId, String date) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/historique/$employeId?date=$date'),
+        headers: _headers,
+      );
+
+      debugPrint('Historique Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data is List ? data : [];
+      } else if (response.statusCode == 404) {
+        return [];
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getHistorique: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getHeuresEquipe(String chefId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/heures-equipe/$chefId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getHeuresEquipe: $e');
+      return {'equipe': []};
+    }
+  }
+
+  Future<Map<String, dynamic>> getHeuresTravailTousLesEmployes(
+    String chefId, {
+    String? dateDebut,
+    String? dateFin,
+  }) async {
+    try {
+      var uri = Uri.parse('$baseUrl/heures-travail-equipe/$chefId');
+      if (dateDebut != null && dateFin != null) {
+        uri = Uri.parse(
+          '$baseUrl/heures-travail-equipe/$chefId?dateDebut=$dateDebut&dateFin=$dateFin'
+        );
+      }
+
+      final response = await http.get(uri, headers: _headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getHeuresTravailTousLesEmployes: $e');
+      return {'employes': [], 'periode': {}};
+    }
+  }
+
+  Future<Map<String, dynamic>> getHistoriqueEquipe(
+    String chefId, {
+    String? dateDebut,
+    String? dateFin,
+    int page = 1,
+    int limit = 10,
+    String? type,
+    String? employeId,
+  }) async {
+    try {
+      var queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (dateDebut != null) 'dateDebut': dateDebut,
+        if (dateFin != null) 'dateFin': dateFin,
+        if (type != null) 'type': type,
+        if (employeId != null) 'employeId': employeId,
+      };
+
+      final uri = Uri.parse('$baseUrl/historique-equipe/$chefId')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(uri, headers: _headers);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getHistoriqueEquipe: $e');
+      return {
+        'items': [],
+        'meta': {'total': 0, 'page': 1, 'limit': 10, 'totalPages': 0},
+        'periode': {}
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getWeeklyHoursChartData(
+    String employeId, 
+    String dateDebut
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/weekly-hours-chart/$employeId?dateDebut=$dateDebut'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getWeeklyHoursChartData: $e');
+      return {
+        'labels': [],
+        'datasets': [{'data': [], 'label': 'Heures travaillées'}]
+      };
+    }
+  }
+
+
+
+  Future<Map<String, dynamic>> getAttendanceDistribution(
+  String employeId, 
+  String dateDebut, 
+  String dateFin
+) async {
   try {
     final response = await http.get(
-      Uri.parse('$baseUrl/historique/$employeId?date=$date'),
+      Uri.parse(
+        '$baseUrl/attendance-distribution/$employeId?dateDebut=$dateDebut&dateFin=$dateFin'
+      ),
+      headers: _headers,
     );
-    
-    debugPrint('Réponse API getHistorique : ${response.statusCode} - ${response.body}');
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      if (data is List) {
-        return data;
+      
+      // Vérifier le message spécial
+      if (data['message'] != null && data['message'].contains("n'était pas encore en poste")) {
+        return {
+          'labels': ['Présent', 'Retard', 'Absent'],
+          'datasets': [{'data': [0, 0, 0]}],
+          'rawData': {
+            'present': 0,
+            'retard': 0,
+            'absent': 0,
+            'joursOuvresTotal': 0,
+            'message': data['message']
+          },
+          'periode': data['periode']
+        };
       }
-      throw Exception("Format de réponse inattendu");
+      
+      return data;
     } else {
-      throw Exception("Échec du chargement de l'historique: ${response.statusCode}");
+      throw _handleError(response);
     }
   } catch (e) {
-    debugPrint('Erreur dans getHistorique: $e');
-    rethrow;
+    return {
+      'labels': ['Présent', 'Retard', 'Absent'],
+      'datasets': [{'data': [0, 0, 0]}],
+      'rawData': {
+        'present': 0,
+        'retard': 0,
+        'absent': 0,
+        'joursOuvresTotal': 0,
+        'message': 'Erreur lors du chargement des données'
+      }
+    };
   }
 }
 
-  // Nombre d'absences (si l'endpoint existe dans votre backend)
-  Future<int> getNombreAbsences(String employeId) async {
+
+
+  Future<Map<String, dynamic>> getEmployeInfo(String employeId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/absences/$employeId'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/employe-info/$employeId'),
+        headers: _headers,
+      );
 
       if (response.statusCode == 200) {
-        final dynamic absencesData = json.decode(response.body);
-        
-        if (absencesData is int) return absencesData;
-        if (absencesData is Map && absencesData.containsKey('absences')) {
-          return absencesData['absences'] as int? ?? 0;
-        }
-        if (absencesData is List) return absencesData.length;
-        
-        return 0;
+        return json.decode(response.body);
       } else {
-        print('Statut HTTP ${response.statusCode} - ${response.body}');
-        return 0;
+        throw _handleError(response);
       }
     } catch (e) {
-      print('Erreur dans getNombreAbsences: $e');
-      return 0;
+      debugPrint('Error in getEmployeInfo: $e');
+      return {};
     }
   }
 
-  // Nombre d'employés présents aujourd'hui
-  Future<int> getNombreEmployesPresentAujourdhui() async {
+  Future<int> getNombreEmployesSousResponsable(String chefId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/stats/presences-aujourdhui'),
+        Uri.parse('$baseUrl/$chefId/nombre-employes'),
+        headers: _headers,
       );
-      
-      if (response.statusCode == 200) {
-        return json.decode(response.body) as int;
-      } else {
-        throw Exception('Erreur lors de la récupération des présences');
-      }
-    } catch (e) {
-      print('Erreur: $e');
-      return 0;
-    }
-  }
 
-  // Nombre d'employés absents aujourd'hui
-  Future<int> getNombreEmployesAbsentAujourdhui() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/absences/aujourdhui'),
-      );
-      
-      print('Réponse API getNombreEmployesAbsentAujourdhui: ${response.body}');
-      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['absences'] as int;
+        return data['nombreEmployes'] as int;
       } else {
-        throw Exception('Erreur lors de la récupération des absences: ${response.statusCode}');
+        throw _handleError(response);
       }
     } catch (e) {
-      print('Erreur dans getNombreEmployesAbsentAujourdhui: $e');
+      debugPrint('Error in getNombreEmployesSousResponsable: $e');
       return 0;
     }
   }
+
+  // Helper pour la gestion des erreurs
+  Exception _handleError(http.Response response) {
+    debugPrint('API Error: ${response.statusCode} - ${response.body}');
+    try {
+      final error = json.decode(response.body);
+      return Exception(error['message'] ?? 'Erreur inconnue');
+    } catch (e) {
+      return Exception('Erreur HTTP ${response.statusCode}');
+    }
+  }
+
+  // Helper pour formater les dates selon le timezone
+  String _formatDate(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(date.toLocal());
+  }
+
+  // Méthodes mises à jour pour Flutter
+Future<int> getNombreEmployesPresentAujourdhui({String? employeId}) async {
+  try {
+    final endpoint = employeId != null 
+      ? '$baseUrl/presences-aujourdhui/$employeId'
+      : '$baseUrl/presences-aujourdhui';
+    
+    final response = await http.get(Uri.parse(endpoint), headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['count'] as int;
+    }
+    return 0;
+  } catch (e) {
+    debugPrint('Error in getNombreEmployesPresentAujourdhui: $e');
+    return 0;
+  }
+}
+
+
+
+ Future<Map<String, dynamic>> getPresenceByWeekdayForAllEmployees(
+    String dateDebut, 
+    String dateFin
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/presence-weekday/all?dateDebut=$dateDebut&dateFin=$dateFin'
+        ),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      debugPrint('Error in getPresenceByWeekdayForAllEmployees: $e');
+      return {
+        'labels': ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'],
+        'datasets': []
+      };
+    }
+  }
+ 
 }

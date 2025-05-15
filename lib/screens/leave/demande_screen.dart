@@ -1,142 +1,108 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
+import 'package:get/get.dart';
+import 'package:flutter/services.dart';
+import '../../auth_controller.dart';
 import 'package:gestion_equipe_flutter/services/demande_service.dart';
 import 'package:gestion_equipe_flutter/services/notification_service.dart';
 import 'package:gestion_equipe_flutter/screens/layoutt/employee_layout.dart';
-import 'package:flutter/services.dart'; // Pour rootBundle
 
-class DemandeScreen extends StatefulWidget {
-  final String employeId;
+class DemandeController extends GetxController {
+  final DemandeService demandeService = Get.find();
+  final NotificationService notificationService = Get.find();
+  final AuthProvider authProvider = Get.find();
 
-  const DemandeScreen({Key? key, required this.employeId}) : super(key: key);
+  final formKey = GlobalKey<FormState>();
+  var typeDemande = Rx<String?>(null);
+  var dateDebut = Rx<DateTime?>(null);
+  var dateFin = Rx<DateTime?>(null);
+  var raison = Rx<String?>(null);
+  var soldeConges = 30.obs;
+  var isSubmitting = false.obs;
+  var showSuccessAnimation = false.obs;
+  var lastNotification = Rx<String?>(null);
 
-  @override
-  _DemandeScreenState createState() => _DemandeScreenState();
-}
+  final dateDebutController = TextEditingController();
+  final dateFinController = TextEditingController();
 
-class _DemandeScreenState extends State<DemandeScreen> {
-  final _formKey = GlobalKey<FormState>();
-  String? _typeDemande;
-  DateTime? _dateDebut;
-  DateTime? _dateFin;
-  String? _raison;
-  int _soldeConges = 30;
-
-  final _dateDebutController = TextEditingController();
-  final _dateFinController = TextEditingController();
-
-  bool _isSubmitting = false;
-  bool _showSuccessAnimation = false;
-
-  final demandeService = DemandeService();
-  final NotificationService _notificationService = NotificationService();
-  String? _lastNotification;
-
-  // Mapping des types de demande
-  final Map<String, String> _typeMapping = {
+  final Map<String, String> typeMapping = {
     'congé': 'CONGE',
-    'absence': 'ABSENCE',
     'autorization_sortie': 'AUTORISATION_SORTIE'
   };
-
-  // Couleurs harmonisées avec EmployeeLayout
-  final Color _primaryColor = const Color(0xFF8B0000);
-  final Color _buttonColor = const Color(0xFF8B0000);
-  final Color _backgroundColor = Colors.white;
-  final Color _textColor = Colors.black87;
-  final Color _borderColor = Colors.grey;
+  String employeId = '';
 
   @override
-  void initState() {
-    super.initState();
-    _initializeNotificationService();
-     _loadSoldeConges();
-    _loadAsset();
+  void onInit() {
+    super.onInit();
+    final authProvider = Get.find<AuthProvider>();
+    if (!authProvider.isAuthenticated.value) {
+      Get.offAllNamed('/login');
+      return;
+    }
+
+    employeId = authProvider.userId.value;
+    
+    if (employeId.isEmpty) {
+      Get.offAllNamed('/login');
+      return;
+    }
+
+    loadSoldeConges();
   }
 
-  Future<void> _loadAsset() async {
+  Future<void> loadSoldeConges() async {
     try {
-      await rootBundle.load('assets/equipe.png');
+      final employeId = Get.parameters['employeId'] ?? '';
+      if (employeId.isEmpty) {
+        Get.snackbar('Erreur', 'ID employé non disponible');
+        return;
+      }
+      
+      final solde = await demandeService.getSoldeConges(employeId);
+      soldeConges.value = solde;
     } catch (e) {
-      print('Error loading asset: $e');
+      print('Error loading solde: $e');
+      soldeConges.value = 30;
     }
   }
 
-   Future<void> _loadSoldeConges() async {
-    try {
-      final solde = await demandeService.getSoldeConges(widget.employeId);
-      if (mounted) {
-        setState(() => _soldeConges = solde);
-      }
-    } catch (e) {
-      print('Erreur chargement solde: $e');
-      if (mounted) {
-        setState(() => _soldeConges = 30); // Valeur par défaut en cas d'erreur
-      }
-    }
-  }
-
-  void _initializeNotificationService() {
-    _notificationService.connect(widget.employeId, (message) {
-      if (!mounted) return;
-      setState(() {
-        _lastNotification = message;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _notificationService.disconnect();
-    _dateDebutController.dispose();
-    _dateFinController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectDateTime(
-      TextEditingController controller, bool isStartDate) async {
+  Future<void> selectDateTime(TextEditingController controller, bool isStartDate) async {
     DateTime? date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: _primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: _primaryColor,
-            ),
-            dialogTheme: const DialogTheme(
-              backgroundColor: Colors.white,
-            ),
+    context: Get.context!,
+    initialDate: DateTime.now(),
+    firstDate: DateTime(2020),
+    lastDate: DateTime(2101),
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: Color(0xFF8B0000),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF8B0000),
           ),
-          child: child!,
-        );
-      },
-    );
+          dialogTheme: DialogTheme(
+            backgroundColor: Colors.white,
+          ),
+        ),
+        child: child!,
+      );
+    },
+  );
 
     if (date != null) {
       TimeOfDay? time = await showTimePicker(
-        context: context,
+        context: Get.context!,
         initialTime: TimeOfDay.now(),
         builder: (context, child) {
           return Theme(
             data: Theme.of(context).copyWith(
               colorScheme: ColorScheme.light(
-                primary: _primaryColor,
+                primary: Color(0xFF8B0000),
                 onPrimary: Colors.white,
                 surface: Colors.white,
-                onSurface: _primaryColor,
+                onSurface: Color(0xFF8B0000),
               ),
             ),
             child: child!,
@@ -145,131 +111,144 @@ class _DemandeScreenState extends State<DemandeScreen> {
       );
 
       if (time != null) {
-        final selectedDateTime =
-            DateTime(date.year, date.month, date.day, time.hour, time.minute);
-        if (!mounted) return;
-        setState(() {
-          if (isStartDate) {
-            _dateDebut = selectedDateTime;
-          } else {
-            _dateFin = selectedDateTime;
-          }
-          controller.text =
-              DateFormat('yyyy-MM-dd – kk:mm').format(selectedDateTime);
-        });
+        final selectedDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        if (isStartDate) {
+          dateDebut.value = selectedDateTime;
+        } else {
+          dateFin.value = selectedDateTime;
+        }
+        controller.text = DateFormat('yyyy-MM-dd – kk:mm').format(selectedDateTime);
       }
     }
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+  // Simuler l'approbation d'une demande
+  Future<void> simulateApproval(String demandeId) async {
+    await Future.delayed(Duration(seconds: 2));
+    notificationService.addEmployeeNotification(
+      'Votre demande de ${typeDemande.value} a été approuvée',
+      demandeId: demandeId,
+    );
+  }
 
-    if (_typeDemande == 'congé') {
-      final days =
-          _dateFin != null ? _dateFin!.difference(_dateDebut!).inDays + 1 : 1;
+  // Simuler le rejet d'une demande
+  Future<void> simulateRejection(String demandeId) async {
+    await Future.delayed(Duration(seconds: 2));
+    notificationService.addEmployeeNotification(
+      'Votre demande de ${typeDemande.value} a été rejetée',
+      demandeId: demandeId,
+    );
+  }
 
-      if (_soldeConges < days) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('❌ Solde insuffisant. Il vous reste $_soldeConges jours'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-    }
-    if (_dateDebut == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Veuillez sélectionner une date de début")),
-      );
+  Future<void> submitForm() async {
+    if (!formKey.currentState!.validate()) {
       return;
     }
 
-    if (_dateDebut!.isBefore(DateTime.now())) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("⏰ La date de début doit être dans le futur")),
-      );
+    if (employeId.isEmpty) {
+      Get.snackbar('Erreur', 'ID employé manquant');
       return;
     }
 
-    if (_dateFin != null && _dateFin!.isBefore(_dateDebut!)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("La date de fin doit être après la date de début")),
-      );
+    if (dateDebut.value == null) {
+      Get.snackbar('Erreur', 'Veuillez sélectionner une date de début');
       return;
     }
 
-    if (_typeDemande == null || _typeMapping[_typeDemande!] == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez sélectionner un type valide")),
-      );
+    final backendType = typeMapping[typeDemande.value!.toLowerCase()];
+    if (backendType == null) {
+      Get.snackbar('Erreur', 'Type de demande invalide');
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    isSubmitting.value = true;
 
     try {
       final demande = {
-        'employeId': widget.employeId,
-        'type': _typeMapping[_typeDemande!], // Utilisation du mapping
-        'dateDebut': _dateDebut!.toIso8601String(),
-        'dateFin': _dateFin?.toIso8601String(),
-        'raison': _raison,
+        'employeId': employeId,
+        'type': backendType,
+        'dateDebut': dateDebut.value!.toIso8601String(),
+        'dateFin': dateFin.value?.toIso8601String(),
+        'raison': raison.value,
       };
 
+      // Simuler la création d'une demande avec un ID aléatoire
+      final demandeId = DateTime.now().millisecondsSinceEpoch.toString();
       final success = await demandeService.createDemande(demande);
-
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-
+      
       if (success) {
-        setState(() => _showSuccessAnimation = true);
-        await Future.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
-        setState(() => _showSuccessAnimation = false);
+        // Notification pour l'employé
+        lastNotification.value = "Votre demande a été envoyée avec succès";
+        
+        // Notification pour le RH (simulée)
+        notificationService.addRHNotification(
+          'Nouvelle demande de ${authProvider.prenom.value} ${authProvider.nom.value} (${typeDemande.value})',
+          demandeId: demandeId,
+        );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Demande soumise avec succès'),
-            backgroundColor: Colors.green,
-          ),
+        Fluttertoast.showToast(
+          msg: "Votre demande a été envoyée avec succès",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.TOP,
+          timeInSecForIosWeb: 3,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0
         );
-        Navigator.pop(context);
+
+        // Simuler une réponse aléatoire (approbation ou rejet)
+        final randomResponse = DateTime.now().second % 2 == 0;
+        if (randomResponse) {
+          await simulateApproval(demandeId);
+        } else {
+          await simulateRejection(demandeId);
+        }
+
+        formKey.currentState?.reset();
+        typeDemande.value = null;
+        dateDebut.value = null;
+        dateFin.value = null;
+        raison.value = null;
+        dateDebutController.clear();
+        dateFinController.clear();
+        
+        await Future.delayed(const Duration(seconds: 2));
+        Get.back();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Erreur lors de l\'envoi de la demande'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Get.snackbar('Erreur', 'Échec de l\'envoi de la demande');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+      Get.snackbar(
+        'Erreur', 
+        'Une erreur est survenue: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 5),
       );
+    } finally {
+      isSubmitting.value = false;
     }
   }
 
   @override
+  void onClose() {
+    dateDebutController.dispose();
+    dateFinController.dispose();
+    super.onClose();
+  }
+}
+
+class DemandeScreen extends StatelessWidget {
+  final DemandeController controller = Get.put(DemandeController());
+
+  @override
   Widget build(BuildContext context) {
+    final args = Get.arguments;
+    if (args != null && args['employeId'] != null) {
+      controller.employeId = args['employeId'].toString();
+    }
+    
     return EmployeeLayout(
       title: 'Nouvelle Demande',
-      notificationService: _notificationService,
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -283,7 +262,7 @@ class _DemandeScreenState extends State<DemandeScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Form(
-                    key: _formKey,
+                    key: controller.formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -301,46 +280,44 @@ class _DemandeScreenState extends State<DemandeScreen> {
                         const SizedBox(height: 16),
                         _buildReasonField(),
                         const SizedBox(height: 16),
-                        _buildDateField(
-                            _dateDebutController, "Date de début *", true),
+                        _buildDateField(controller.dateDebutController, "Date de début *", true),
                         const SizedBox(height: 16),
-                        _buildDateField(_dateFinController,
-                            "Date de fin (optionnelle)", false),
-                        if (_typeDemande == 'congé')
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Solde disponible: $_soldeConges jours',
-                                  style: TextStyle(
-                                    color: _soldeConges > 0
-                                        ? _primaryColor
-                                        : Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (_soldeConges <= 0)
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 4.0),
-                                    child: Text(
-                                      'Vous n\'avez plus de jours de congé disponibles',
+                        _buildDateField(controller.dateFinController, "Date de fin (optionnelle)", false),
+                        Obx(() => controller.typeDemande.value == 'congé'
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Solde disponible: ${controller.soldeConges.value} jours',
                                       style: TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 12,
+                                        color: controller.soldeConges.value > 0
+                                            ? Color(0xFF8B0000)
+                                            : Colors.red,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 24),
-                        _buildCaptchaRow(),
+                                    if (controller.soldeConges.value <= 0)
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 4.0),
+                                        child: Text(
+                                          'Vous n\'avez plus de jours de congé disponibles',
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              )
+                            : SizedBox.shrink()),
                         const SizedBox(height: 24),
                         _buildSubmitButton(),
-                        if (_lastNotification != null)
-                          _buildNotificationBadge(),
+                        Obx(() => controller.lastNotification.value != null
+                            ? _buildNotificationBadge()
+                            : SizedBox.shrink()),
                       ],
                     ),
                   ),
@@ -354,34 +331,29 @@ class _DemandeScreenState extends State<DemandeScreen> {
   }
 
   Widget _buildDropdownField() {
-    return DropdownButtonFormField<String>(
-      value: _typeDemande,
-      onChanged: (newValue) => setState(() => _typeDemande = newValue),
-      items: const [
-        DropdownMenuItem(
-          value: 'congé',
-          child: Text('Congé'),
-        ),
-        DropdownMenuItem(
-          value: 'absence',
-          child: Text('Absence'),
-        ),
-        DropdownMenuItem(
-          value: 'autorization_sortie',
-          child: Text('Autorisation de sortie'),
-        ),
-      ],
-      decoration: InputDecoration(
-        labelText: "Type de Demande *",
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-      validator: (value) =>
-          value == null ? 'Veuillez sélectionner un type de demande' : null,
-    );
+    return Obx(() => DropdownButtonFormField<String>(
+          value: controller.typeDemande.value,
+          onChanged: (newValue) => controller.typeDemande.value = newValue,
+          items: const [
+            DropdownMenuItem(
+              value: 'congé',
+              child: Text('Congé'),
+            ),
+            DropdownMenuItem(
+              value: 'autorization_sortie',
+              child: Text('Autorisation de sortie'),
+            ),
+          ],
+          decoration: InputDecoration(
+            labelText: "Type de Demande *",
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          validator: (value) =>
+              value == null ? 'Veuillez sélectionner un type de demande' : null,
+        ));
   }
 
   Widget _buildReasonField() {
@@ -391,115 +363,90 @@ class _DemandeScreenState extends State<DemandeScreen> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       maxLines: 3,
-      onChanged: (value) => _raison = value,
+      onChanged: (value) => controller.raison.value = value,
       validator: (value) =>
           value == null || value.isEmpty ? 'Veuillez fournir une raison' : null,
     );
   }
 
   Widget _buildDateField(
-      TextEditingController controller, String label, bool isRequired) {
+    TextEditingController textController, String label, bool isStartDate) {
     return TextFormField(
-      controller: controller,
+      controller: textController,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         suffixIcon: const Icon(Icons.calendar_today),
       ),
       readOnly: true,
-      onTap: () => _selectDateTime(controller, isRequired),
-      validator: isRequired
+      onTap: () => controller.selectDateTime(textController, isStartDate),
+      validator: isStartDate
           ? (value) =>
               value == null || value.isEmpty ? 'Ce champ est obligatoire' : null
           : null,
     );
   }
 
-  Widget _buildCaptchaRow() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: _borderColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Checkbox(
-            value: false,
-            onChanged: (val) {},
-            activeColor: _buttonColor,
-          ),
-          const SizedBox(width: 8),
-          const Text("Je ne suis pas un robot"),
-          const Spacer(),
-          const Icon(Icons.verified_user, color: Colors.blue),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubmitButton() {
-    return ElevatedButton(
-      onPressed: _isSubmitting ? null : _submitForm,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _buttonColor,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-      child: _isSubmitting
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : _showSuccessAnimation
-              ? const Icon(Icons.check_circle, color: Colors.white, size: 24)
-              : const Text(
-                  'Soumettre La Demande',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+    return Obx(() => ElevatedButton(
+          onPressed: controller.isSubmitting.value ? null : controller.submitForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF8B0000),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: controller.isSubmitting.value
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
-                ),
-    );
+                )
+              : controller.showSuccessAnimation.value
+                  ? const Icon(Icons.check_circle, color: Colors.white, size: 24)
+                  : const Text(
+                      'Soumettre La Demande',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+        ));
   }
 
   Widget _buildNotificationBadge() {
-    return AnimatedOpacity(
-      opacity: _lastNotification != null ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 500),
-      child: Container(
-        margin: const EdgeInsets.only(top: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _borderColor),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.notifications, color: _buttonColor),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(_lastNotification ?? ''),
+    return Obx(() => AnimatedOpacity(
+          opacity: controller.lastNotification.value != null ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 500),
+          child: Container(
+            margin: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey),
             ),
-          ],
-        ),
-      ),
-    );
+            child: Row(
+              children: [
+                Icon(Icons.notifications, color: Color(0xFF8B0000)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(controller.lastNotification.value ?? ''),
+                ),
+              ],
+            ),
+          ),
+        ));
   }
 }

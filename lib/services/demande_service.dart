@@ -1,12 +1,14 @@
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-class DemandeService {
-  final String baseUrl = 'http://localhost:3000';  // Remplacez par l'URL de votre API
-   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+class DemandeService extends GetxService {
+  final String baseUrl = 'http://localhost:3000';
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
- Future<Map<String, String>> _getHeaders() async {
+  Future<Map<String, String>> _getHeaders() async {
     final token = await _storage.read(key: 'jwt_token');
     return {
       'Content-Type': 'application/json',
@@ -19,7 +21,7 @@ class DemandeService {
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: await _getHeaders(),
         body: json.encode({
           'employeId': demandeData['employeId'],
           'type': demandeData['type'],
@@ -32,21 +34,20 @@ class DemandeService {
       if (response.statusCode == 201) {
         return true;
       } else {
-        print('Erreur: ${response.statusCode} - ${response.body}');
+        debugPrint('Erreur: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Erreur réseau: $e');
+      debugPrint('Erreur réseau: $e');
       return false;
     }
   }
 
-  //recuperer tout les demande 
- Future<List<dynamic>> getAllDemandes({int page = 1, int limit = 50}) async {
+  Future<List<dynamic>> getAllDemandes({int page = 1, int limit = 50}) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/demande?page=$page&limit=$limit'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _getHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -59,11 +60,11 @@ class DemandeService {
     }
   }
 
-   Future<List<dynamic>> getEmployeeDemandes(String employeId) async {
+  Future<List<dynamic>> getEmployeeDemandes(String employeId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/demande/$employeId/historique'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _getHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -72,58 +73,63 @@ class DemandeService {
         throw Exception('Erreur ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('Erreur: $e');
+      debugPrint('Erreur: $e');
       return [];
     }
   }
 
- Future<int> getSoldeConges(String employeId) async {
+  Future<int> getSoldeConges(String employeId) async {
     try {
+      if (employeId.isEmpty) {
+        debugPrint('EmployeId is empty in getSoldeConges');
+        return 30;
+      }
+
       final response = await http.get(
         Uri.parse('$baseUrl/demande/$employeId/solde'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _getHeaders(),
       );
 
-      final data = json.decode(response.body);
-      
       if (response.statusCode == 200) {
-        return data['soldeConges'] is int 
-          ? data['soldeConges'] 
-          : int.tryParse(data['soldeConges'].toString()) ?? 30;
+        final data = json.decode(response.body);
+        final solde = data['soldeConges'] ?? data['data']?['soldeConges'];
+        return (solde is int ? solde : int.tryParse(solde.toString()) ?? 30);
       } else {
-        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+        debugPrint('Error getting solde conges: ${response.statusCode}');
+        return 30;
       }
     } catch (e) {
-      throw Exception('Erreur: $e');
+      debugPrint('Exception in getSoldeConges: $e');
+      return 30;
     }
   }
 
   Future<void> supprimerDemande(String demandeId, String userId) async {
-  final url = Uri.parse('$baseUrl/demande/$demandeId');
-  try {
-    final response = await http.delete(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'userId': userId}),
-    );
+    final url = Uri.parse('$baseUrl/demande/$demandeId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: await _getHeaders(),
+        body: jsonEncode({'userId': userId}),
+      );
 
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      if (responseData['message'] != null) {
-        return;
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['message'] != null) {
+          return;
+        }
+        throw Exception('Réponse inattendue du serveur');
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Échec de la suppression de la demande');
       }
-      throw Exception('Réponse inattendue du serveur');
-    } else {
-      final errorData = json.decode(response.body);
-      throw Exception(errorData['message'] ?? 'Échec de la suppression de la demande');
+    } catch (e) {
+      debugPrint('Erreur lors de la suppression: $e');
+      throw Exception('Erreur réseau: $e');
     }
-  } catch (e) {
-    print('Erreur lors de la suppression: $e');
-    throw Exception('Erreur réseau: $e');
   }
-}
 
-   Future<bool> updateDemande(String demandeId, Map<String, dynamic> updatedData) async {
+  Future<bool> updateDemande(String demandeId, Map<String, dynamic> updatedData) async {
     final url = Uri.parse('$baseUrl/demande/$demandeId');
     try {
       final response = await http.patch(
@@ -144,56 +150,61 @@ class DemandeService {
     }
   }
 
-Future<void> approveDemande(
-    String demandeId, 
-    String userId, {
-    int? days,
-  }) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('$baseUrl/demande/$demandeId/approve'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'userId': userId,
-          if (days != null) 'days': days,
-        }),
-      );
+  Future<void> approveDemande(
+      String demandeId, 
+      String userId, {
+      int? days,
+    }) async {
+      try {
+        final response = await http.patch(
+          Uri.parse('$baseUrl/demande/$demandeId/approve'),
+          headers: await _getHeaders(),
+          body: json.encode({
+            'userId': userId,
+            if (days != null) 'days': days,
+          }),
+        );
 
-      if (response.statusCode != 200) {
-        throw Exception('Échec approbation: ${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('Échec approbation: ${response.body}');
+        }
+      } catch (e) {
+        throw Exception('Erreur réseau: $e');
       }
-    } catch (e) {
-      throw Exception('Erreur réseau: $e');
     }
-  }
 
-Future<void> rejectDemande(
-    String demandeId, 
-    String userId, {
-    required String raison,
-    required String type,
-  }) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('$baseUrl/demande/$demandeId/reject'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'userId': userId,
-          'raison': raison,
-          'type': type,
-        }),
-      );
+  Future<void> rejectDemande(
+      String demandeId, 
+      String userId, {
+      required String raison,
+      required String type,
+    }) async {
+      try {
+        final response = await http.patch(
+          Uri.parse('$baseUrl/demande/$demandeId/reject'),
+          headers: await _getHeaders(),
+          body: json.encode({
+            'userId': userId,
+            'raison': raison,
+            'type': type,
+          }),
+        );
 
-      if (response.statusCode != 200) {
-        throw Exception('Échec rejet: ${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('Échec rejet: ${response.body}');
+        }
+      } catch (e) {
+        throw Exception('Erreur réseau: $e');
       }
-    } catch (e) {
-      throw Exception('Erreur réseau: $e');
     }
-  }
 
-  Future<List<dynamic>> getTeamLeaveRequests(String responsableId) async {
+Future<List<dynamic>> getTeamLeaveRequests(String responsableId) async {
   try {
+    // Validate responsableId
+    if (responsableId.isEmpty) {
+      throw Exception('Responsable ID cannot be empty');
+    }
+
     final response = await http.get(
       Uri.parse('$baseUrl/demande/equipe/en-conge/$responsableId'),
       headers: await _getHeaders(),
@@ -211,6 +222,11 @@ Future<void> rejectDemande(
 
 Future<List<dynamic>> getUpcomingTeamLeaveRequests(String responsableId) async {
   try {
+    // Validate responsableId
+    if (responsableId.isEmpty) {
+      throw Exception('Responsable ID cannot be empty');
+    }
+
     final response = await http.get(
       Uri.parse('$baseUrl/demande/equipe/conges-a-venir/$responsableId'),
       headers: await _getHeaders(),
@@ -226,21 +242,37 @@ Future<List<dynamic>> getUpcomingTeamLeaveRequests(String responsableId) async {
   }
 }
 
+  Future<List<dynamic>> getUpcomingLeaves() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/demande/conges/a-venir'),
+        headers: await _getHeaders(),
+      );
 
-Future<List<dynamic>> getUpcomingLeaves() async {
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Erreur réseau: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getJoursFeries(int year) async {
   try {
     final response = await http.get(
-      Uri.parse('$baseUrl/demande/conges/a-venir'),
+      Uri.parse('$baseUrl/jours-feries?year=$year'),
       headers: await _getHeaders(),
     );
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      return List<Map<String, dynamic>>.from(json.decode(response.body));
     }
+    throw Exception('Failed to load holidays');
   } catch (e) {
-    throw Exception('Erreur réseau: $e');
+    debugPrint('Error getting holidays: $e');
+    return [];
   }
 }
 }

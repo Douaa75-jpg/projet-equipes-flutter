@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gestion_equipe_flutter"
+    namespace "com.example.gestion_equipe_flutter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

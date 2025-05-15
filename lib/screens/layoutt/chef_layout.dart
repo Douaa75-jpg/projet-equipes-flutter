@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import '../../AuthProvider.dart';
+import 'package:get/get.dart';
+import '../../auth_controller.dart';
 import '../acceuil/accueil_chef_.dart';
 import '../dashboard/chef_equipe_dashboard_screen.dart';
 import '../../services/notification_service.dart';
@@ -21,18 +21,18 @@ class ChefLayout extends StatefulWidget {
   });
 
   @override
-  State<ChefLayout> createState() => _RhLayoutState();
+  State<ChefLayout> createState() => _ChefLayoutState();
 }
 
-class _RhLayoutState extends State<ChefLayout> {
+class _ChefLayoutState extends State<ChefLayout> {
   String _currentRoute = '/Accueilchef';
   bool _isDrawerOpen = false;
+  final AuthProvider authProvider = Get.find<AuthProvider>();
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final nom = authProvider.nom ?? '';
-    final prenom = authProvider.prenom ?? '';
+    final nom = authProvider.nom.value;
+    final prenom = authProvider.prenom.value;
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
@@ -126,8 +126,7 @@ class _RhLayoutState extends State<ChefLayout> {
         children: [
           DrawerHeader(
             decoration: const BoxDecoration(
-              color: Color(0xFF8B0000),
-            ),
+              color: Color(0xFF8B0000)),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +139,7 @@ class _RhLayoutState extends State<ChefLayout> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Menu RH',
+                  'Menu Chef d\'équipe',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -178,7 +177,7 @@ class _RhLayoutState extends State<ChefLayout> {
       leading: Icon(icon),
       title: Text(title),
       onTap: () {
-        Navigator.pop(context); // Ferme le drawer
+        Get.back(); // Ferme le drawer
         _navigateToRoute(context, route);
       },
     );
@@ -236,19 +235,10 @@ class _RhLayoutState extends State<ChefLayout> {
     });
 
     if (route == '/Accueilchef') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const Accueilchef()),
-      );
+      Get.offAll(() => const Accueilchef());
     } else if (route == '/dashboard') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChefEquipeDashboard(
-          ),
-        ),
-      );
-    } 
+      Get.offAll(() => ChefEquipeDashboard());
+    }
   }
 
   Widget _buildNavItem(BuildContext context, String title, String route) {
@@ -287,10 +277,8 @@ class _RhLayoutState extends State<ChefLayout> {
       onSelected: (value) {
         switch (value) {
           case 'parametres':
-            // Navigation vers paramètres
             break;
-          case 'aides':
-            // Navigation vers aides
+          case 'aide':
             break;
           case 'deconnexion':
             _showLogoutDialog(context);
@@ -350,29 +338,25 @@ class _RhLayoutState extends State<ChefLayout> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirmer la déconnexion'),
-          content: const Text('Voulez-vous vraiment vous déconnecter ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                authProvider.logout();
-                Navigator.of(context).pushReplacementNamed('/login');
-              },
-              child: const Text('Déconnecter', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Confirmer la déconnexion'),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              authProvider.logout();
+              Get.offAllNamed('/login');
+            },
+            child: const Text('Déconnecter', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }

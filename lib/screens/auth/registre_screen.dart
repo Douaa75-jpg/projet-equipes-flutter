@@ -1,100 +1,106 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class RegisterPage extends StatefulWidget {
-  @override
-  State<RegisterPage> createState() => _RegisterPageState();
-}
+class RegisterController extends GetxController {
+  final formKey = GlobalKey<FormState>();
+  final dateController = TextEditingController();
 
-class _RegisterPageState extends State<RegisterPage> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController dateController = TextEditingController();
-
-  String nom = '';
-  String prenom = '';
-  String email = '';
-  String motDePasse = '';
-  String role = 'EMPLOYE';
-  String? matricule;
-  String? datedenaissance;
-  List<dynamic> chefsEquipe = [];
-
-  bool isLoading = false;
+  var nom = ''.obs;
+  var prenom = ''.obs;
+  var email = ''.obs;
+  var motDePasse = ''.obs;
+  var role = 'EMPLOYE'.obs;
+  var matricule = ''.obs;
+  var datedenaissance = ''.obs;
+  var chefsEquipe = <dynamic>[].obs;
+  var isLoading = false.obs;
 
   @override
-  void initState() {
-    super.initState();
+  void onInit() {
+    super.onInit();
+    fetchChefsEquipe();
+  }
+
+  @override
+  void onClose() {
+    dateController.dispose();
+    super.onClose();
   }
 
   Future<void> fetchChefsEquipe() async {
-    setState(() => isLoading = true);
-    final response = await http.get(Uri.parse('http://localhost:3000/utilisateurs/chefs-equipe'));
-    if (response.statusCode == 200) {
-      setState(() {
-        chefsEquipe = json.decode(response.body);
-        isLoading = false;
-      });
-    } else {
-      setState(() => isLoading = false);
-      print('Erreur lors du chargement des chefs d\'équipe');
+    isLoading.value = true;
+    try {
+      final response = await http.get(Uri.parse('http://localhost:3000/utilisateurs/chefs-equipe'));
+      if (response.statusCode == 200) {
+        chefsEquipe.value = json.decode(response.body);
+      } else {
+        Get.snackbar('Erreur', 'Impossible de charger les chefs d\'équipe');
+      }
+    } catch (e) {
+      Get.snackbar('Erreur', 'Problème de connexion: ${e.toString()}');
+    } finally {
+      isLoading.value = false;
     }
   }
 
   Future<void> registerUser() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!formKey.currentState!.validate()) return;
 
-    _formKey.currentState!.save();
+    formKey.currentState!.save();
 
-    if (datedenaissance == null || datedenaissance!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La date de naissance est requise.')),
-      );
+    if (datedenaissance.value.isEmpty) {
+      Get.snackbar('Erreur', 'La date de naissance est requise');
       return;
     }
 
     final Map<String, dynamic> userData = {
-      'nom': nom,
-      'prenom': prenom,
-      'email': email,
-      'motDePasse': motDePasse,
-      'role': role,
-      'matricule': matricule,
-      'datedenaissance': datedenaissance,
+      'nom': nom.value,
+      'prenom': prenom.value,
+      'email': email.value,
+      'motDePasse': motDePasse.value,
+      'role': role.value,
+      'matricule': matricule.value,
+      'datedenaissance': datedenaissance.value,
     };
 
-    if (role == 'RESPONSABLE') {
+    if (role.value == 'RESPONSABLE') {
       userData['typeResponsable'] = 'CHEF_EQUIPE';
     }
 
-    setState(() => isLoading = true);
+    isLoading.value = true;
 
-    final response = await http.post(
-      Uri.parse('http://localhost:3000/utilisateurs'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(userData),
-    );
-
-    setState(() => isLoading = false);
-
-    if (response.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Utilisateur créé avec succès')),
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:3000/utilisateurs'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(userData),
       );
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : ${response.body}')),
-      );
+
+      if (response.statusCode == 201) {
+        Get.snackbar('Succès', 'Utilisateur créé avec succès');
+        Get.back(); // Return to previous screen
+      } else {
+        Get.snackbar('Erreur', 'Erreur lors de la création: ${response.body}');
+      }
+    } catch (e) {
+      Get.snackbar('Erreur', 'Problème de connexion: ${e.toString()}');
+    } finally {
+      isLoading.value = false;
     }
   }
+}
+
+class RegisterPage extends StatelessWidget {
+  final RegisterController controller = Get.put(RegisterController());
+
+  RegisterPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Color(0xFF8B0000); // Rouge bordeaux
-    final accentColor = Color(0xFFD32F2F); // Rouge plus clair
-    final backgroundColor = Color(0xFFF5F5F5); // Fond gris clair
-    final textColor = Color(0xFF333333); // Texte foncé
+    final primaryColor = Color(0xFF8B0000);
+    final backgroundColor = Color(0xFFF5F5F5);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -118,7 +124,7 @@ class _RegisterPageState extends State<RegisterPage> {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Form(
-                key: _formKey,
+                key: controller.formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -145,18 +151,18 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _buildTextField('Nom', Icons.person, (val) => nom = val!),
-                    _buildTextField('Prénom', Icons.person_outline, (val) => prenom = val!),
-                    _buildTextField('Email', Icons.email, (val) => email = val!, isEmail: true),
-                    _buildTextField('Mot de passe', Icons.lock, (val) => motDePasse = val!,
+                    _buildTextField('Nom', Icons.person, (val) => controller.nom.value = val!),
+                    _buildTextField('Prénom', Icons.person_outline, (val) => controller.prenom.value = val!),
+                    _buildTextField('Email', Icons.email, (val) => controller.email.value = val!, isEmail: true),
+                    _buildTextField('Mot de passe', Icons.lock, (val) => controller.motDePasse.value = val!,
                         isPassword: true),
-                    _buildTextField('Matricule', Icons.badge, (val) => matricule = val),
+                    _buildTextField('Matricule', Icons.badge, (val) => controller.matricule.value = val ?? ''),
                     _buildDateField(),
                     const SizedBox(height: 16),
                     _buildRoleDropdown(),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: isLoading ? null : registerUser,
+                    Obx(() => ElevatedButton(
+                      onPressed: controller.isLoading.value ? null : controller.registerUser,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
@@ -166,7 +172,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         elevation: 2,
                       ),
-                      child: isLoading
+                      child: controller.isLoading.value
                           ? const SizedBox(
                               height: 20,
                               width: 20,
@@ -179,10 +185,10 @@ class _RegisterPageState extends State<RegisterPage> {
                               'Créer le compte',
                               style: TextStyle(fontSize: 16),
                             ),
-                    ),
+                    )),
                     const SizedBox(height: 16),
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Get.back(),
                       child: Text(
                         'Retour',
                         style: TextStyle(
@@ -247,11 +253,11 @@ class _RegisterPageState extends State<RegisterPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
-        controller: dateController,
+        controller: controller.dateController,
         readOnly: true,
         onTap: () async {
           final pickedDate = await showDatePicker(
-            context: context,
+            context: Get.context!,
             initialDate: DateTime(2000),
             firstDate: DateTime(1900),
             lastDate: DateTime.now(),
@@ -269,10 +275,8 @@ class _RegisterPageState extends State<RegisterPage> {
             },
           );
           if (pickedDate != null) {
-            setState(() {
-              datedenaissance = pickedDate.toIso8601String().split('T')[0];
-              dateController.text = datedenaissance!;
-            });
+            controller.datedenaissance.value = pickedDate.toIso8601String().split('T')[0];
+            controller.dateController.text = controller.datedenaissance.value;
           }
         },
         decoration: InputDecoration(
@@ -299,8 +303,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildRoleDropdown() {
-    return DropdownButtonFormField<String>(
-      value: role,
+    return Obx(() => DropdownButtonFormField<String>(
+      value: controller.role.value,
       items: const [
         DropdownMenuItem(
           value: 'EMPLOYE',
@@ -312,9 +316,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       ],
       onChanged: (value) {
-        setState(() {
-          role = value!;
-        });
+        controller.role.value = value!;
       },
       decoration: InputDecoration(
         labelText: 'Rôle',
@@ -336,6 +338,6 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       dropdownColor: Colors.white,
       icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
-    );
+    ));
   }
 }

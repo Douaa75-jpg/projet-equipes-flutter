@@ -1,132 +1,95 @@
 import 'package:flutter/material.dart';
-import '../../services/Employe_Service.dart';
-import '../../services/pointage_service.dart';
-import '../../services/demande_service.dart';
+import 'package:get/get.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import '../../services/Employe_Service.dart';
+import '../../services/pointage_service.dart';
+import '../../services/demande_service.dart';
 import '../layoutt/rh_layout.dart';
 import '../../services/notification_service.dart';
 
-class ListeEmployeScreen extends StatefulWidget {
-  const ListeEmployeScreen({super.key});
-
-  @override
-  State<ListeEmployeScreen> createState() => _ListeEmployeScreenState();
-}
-
-class _ListeEmployeScreenState extends State<ListeEmployeScreen> {
-  final EmployeService _employeService = EmployeService();
+class ListeEmployeController extends GetxController {
+  final EmployeService _employeService = Get.put(EmployeService());
   final PointageService _pointageService = PointageService();
   final DemandeService _demandeService = DemandeService();
-  final NotificationService _notificationService = NotificationService();
 
-  List<Employe> _employees = [];
-  List<Employe> _filteredEmployees = [];
-  List<Employe> _chefsEquipe = [];
-  Map<String, String?> _selectedChefs = {};
-  String _searchQuery = '';
-  String? _selectedResponsable;
-  bool _isLoading = true;
+  var employees = <Employe>[].obs;
+  var filteredEmployees = <Employe>[].obs;
+  var chefsEquipe = <Employe>[].obs;
+  var selectedChefs = <String, String?>{}.obs;
+  var searchQuery = ''.obs;
+  var selectedResponsable = Rxn<String>();
+  var isLoading = true.obs;
 
   @override
-  void initState() {
-    super.initState();
-    _selectedChefs = {};
-    _loadData();
+  void onInit() {
+    super.onInit();
+    loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> loadData() async {
     try {
-      await Future.wait([
-        _loadEmployees(),
-        _loadChefsEquipe(),
-      ]);
+      isLoading(true);
+      await Future.wait([loadEmployees(), loadChefsEquipe()]);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur de chargement: ${e.toString()}')),
-        );
-      }
+      Get.snackbar('Erreur', 'Erreur de chargement: ${e.toString()}');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      isLoading(false);
     }
   }
 
-  Future<void> _loadEmployees() async {
-    final employees = await _employeService.getEmployees();
-    if (mounted) {
-      setState(() {
-        _employees = employees;
-        _filteredEmployees = employees;
-        _selectedChefs = {
-          for (var emp in employees) 
-            emp.id: emp.responsable?.id
-        };
-      });
+  Future<void> loadEmployees() async {
+    await _employeService.fetchEmployees();
+    employees.assignAll(_employeService.employees);
+    filterEmployees();
+    
+    selectedChefs.clear();
+    for (var emp in employees) {
+      selectedChefs[emp.id] = emp.responsable?.id;
     }
   }
 
-Future<void> _loadChefsEquipe() async {
-  try {
-    final chefs = await _employeService.getChefsEquipe();
-    if (mounted) {
-      setState(() => _chefsEquipe = chefs);
+  Future<void> loadChefsEquipe() async {
+    try {
+      await _employeService.fetchChefsEquipe();
+      chefsEquipe.assignAll(_employeService.chefsEquipe);
+    } catch (e) {
+      Get.snackbar('Erreur', 'Erreur de chargement des chefs d\'équipe: ${e.toString()}',
+          duration: const Duration(seconds: 5));
+      chefsEquipe.clear();
     }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur de chargement des chefs d\'équipe: ${e.toString()}'),
-          duration: Duration(seconds: 5),
-        ),
-      );
-    }
-    setState(() => _chefsEquipe = []);
   }
-}
 
-  Future<void> _assignChefEquipe(String employeId, String? chefId) async {
+  Future<void> assignChefEquipe(String employeId, String? chefId) async {
     try {
       await _employeService.assignerResponsable(employeId, chefId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Chef d\'équipe assigné avec succès')),
-        );
-        await _loadEmployees();
-      }
+      Get.snackbar('Succès', 'Chef d\'équipe assigné avec succès');
+      await loadEmployees();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
-      }
+      Get.snackbar('Erreur', e.toString());
     }
   }
 
-  void _filterEmployees() {
-    setState(() {
-      _filteredEmployees = _employees.where((employee) {
-        final nameMatch = '${employee.prenom} ${employee.nom}'
-            .toLowerCase()
-            .contains(_searchQuery.toLowerCase());
+  void filterEmployees() {
+    filteredEmployees.assignAll(employees.where((employee) {
+      final nameMatch = '${employee.prenom} ${employee.nom}'
+          .toLowerCase()
+          .contains(searchQuery.value.toLowerCase());
+      
+      final responsableName = employee.responsable != null 
+        ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
+        : 'Aucun responsable';
         
-        final responsableName = employee.responsable != null 
-          ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
-          : 'Aucun responsable';
+      final responsableMatch = selectedResponsable.value == null ||
+          responsableName == selectedResponsable.value;
           
-        final responsableMatch = _selectedResponsable == null ||
-            responsableName == _selectedResponsable;
-            
-        return nameMatch && responsableMatch;
-      }).toList();
-    });
+      return nameMatch && responsableMatch;
+    }).toList());
   }
 
-  String _formatDate(String dateString) {
+  String formatDate(String dateString) {
     try {
       if (dateString.isEmpty) return 'Non spécifié';
       return DateFormat('dd/MM/yyyy').format(DateTime.parse(dateString));
@@ -135,34 +98,248 @@ Future<void> _loadChefsEquipe() async {
     }
   }
 
+  Future<void> exportToPDF() async {
+    final pdf = pw.Document();
+
+    // Ajout de l'en-tête avec logo et informations
+    final imageProvider = await networkImage('assets/logo.png'); // Remplacez par votre logo
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            children: [
+              // En-tête avec logo et informations de l'entreprise
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Image(imageProvider, width: 100, height: 100),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('ZETA-BOX',
+                          style: pw.TextStyle(
+                              fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('B-51, Emna City, Av. Hedi Nouira, Sfax 3027',
+                          style: pw.TextStyle(fontSize: 12)),
+                      pw.Text('Tél: 29 009 390',
+                          style: pw.TextStyle(fontSize: 12)),
+                      pw.Text('Email: contact-tn@zeta-Box.com',
+                          style: pw.TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Header(
+                level: 0,
+                child: pw.Text('Liste des Employés',
+                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Table(
+                border: pw.TableBorder.all(),
+                children: [
+                  pw.TableRow(
+                    children: [
+                      pw.Text('Nom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Prénom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Email', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Matricule', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Responsable', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Solde congés', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                  ...filteredEmployees.map((employee) => pw.TableRow(
+                        children: [
+                          pw.Text(employee.nom),
+                          pw.Text(employee.prenom),
+                          pw.Text(employee.email),
+                          pw.Text(employee.matricule),
+                          pw.Text(
+                            employee.responsable != null
+                              ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
+                              : 'Aucun responsable'
+                          ),
+                          
+                          pw.Text('${_demandeService.getSoldeConges(employee.id)} jours'),
+                        ],
+                      )),
+                ],
+              ),
+              pw.SizedBox(height: 30),
+              // Signature et date
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Fait à: sfax',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                      pw.Text(
+                          'Le: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 150,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.Text('Signature et cachet',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  Future<void> exportEmployeeToPDF(Employe employee, int solde) async {
+    final pdf = pw.Document();
+    final imageProvider = await networkImage('assets/logo.png'); // Remplacez par votre logo
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            children: [
+              // En-tête avec logo et informations de l'entreprise
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Image(imageProvider, width: 100, height: 100),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('ZETA-BOX',
+                          style: pw.TextStyle(
+                              fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('B-51, Emna City, Av. Hedi Nouira, Sfax 3027',
+                          style: pw.TextStyle(fontSize: 12)),
+                      pw.Text('Tél: 29 009 390',
+                          style: pw.TextStyle(fontSize: 12)),
+                      pw.Text('Email: contact-tn@zeta-Box.com',
+                          style: pw.TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Header(
+                level: 0,
+                child: pw.Text('Fiche Employé', 
+                    style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Text('${employee.prenom} ${employee.nom}',
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+              buildPdfDetailRow('Nom', employee.nom),
+              buildPdfDetailRow('Prénom', employee.prenom),
+              buildPdfDetailRow('Email', employee.email),
+              buildPdfDetailRow('Matricule', employee.matricule),
+              buildPdfDetailRow('Date de naissance', formatDate(employee.datedenaissance)),
+              buildPdfDetailRow(
+                'Responsable', 
+                employee.responsable != null
+                  ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
+                  : 'Aucun responsable'
+              ),
+              
+              buildPdfDetailRow('Solde congés', '$solde jours'),
+              pw.SizedBox(height: 30),
+              // Signature et date
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Fait à: sfax',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                      pw.Text(
+                          'Le: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                    ],
+                  ),
+                  pw.Column(
+                    children: [
+                      pw.Container(
+                        width: 150,
+                        height: 1,
+                        color: PdfColors.black,
+                      ),
+                      pw.Text('Signature et cachet',
+                          style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
+  pw.Widget buildPdfDetailRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 10),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(
+            width: 100,
+            child: pw.Text('$label:',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Text(value),
+        ],
+      ),
+    );
+  }
+}
+
+class ListeEmployeScreen extends StatelessWidget {
+  ListeEmployeScreen({super.key});
+
+  final ListeEmployeController controller = Get.put(ListeEmployeController());
+
   @override
   Widget build(BuildContext context) {
-    final responsables = _employees
-        .map((e) => e.responsable != null 
-            ? '${e.responsable!.prenom} ${e.responsable!.nom}' 
-            : 'Aucun responsable')
-        .toSet()
-        .toList();
-
     return RhLayout(
       title: 'Liste des employés',
-      notificationService: _notificationService,
       child: Column(
         children: [
-          _buildSearchBar(responsables),
+          _buildSearchBar(),
           Expanded(
-            child: _isLoading
+            child: Obx(() => controller.isLoading.value
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredEmployees.isEmpty
+                : controller.filteredEmployees.isEmpty
                     ? _buildEmptyState()
-                    : _buildEmployeeTable(),
+                    : _buildEmployeeTable()),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar(List<String> responsables) {
+  Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Card(
@@ -184,18 +361,16 @@ Future<void> _loadChefsEquipe() async {
                     ),
                   ),
                   onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                      _filterEmployees();
-                    });
+                    controller.searchQuery.value = value;
+                    controller.filterEmployees();
                   },
                 ),
               ),
               const SizedBox(width: 10),
-              _buildResponsableFilter(responsables),
+              _buildResponsableFilter(),
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                onPressed: _exportToPDF,
+                onPressed: controller.exportToPDF,
                 tooltip: 'Exporter en PDF',
               ),
             ],
@@ -205,36 +380,43 @@ Future<void> _loadChefsEquipe() async {
     );
   }
 
-  Widget _buildResponsableFilter(List<String> responsables) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.red),
-      ),
-      child: DropdownButton<String>(
-        value: _selectedResponsable,
-        hint: const Text('Filtrer par responsable'),
-        underline: const SizedBox(),
-        icon: const Icon(Icons.filter_list, color: Colors.red),
-        items: [
-          const DropdownMenuItem(
-            value: null,
-            child: Text('Tous les responsables'),
-          ),
-          ...responsables.map((responsable) => DropdownMenuItem(
-                value: responsable,
-                child: Text(responsable),
-              )),
-        ],
-        onChanged: (value) {
-          setState(() {
-            _selectedResponsable = value;
-            _filterEmployees();
-          });
-        },
-      ),
-    );
+  Widget _buildResponsableFilter() {
+    return Obx(() {
+      final responsables = controller.employees
+          .map((e) => e.responsable != null 
+              ? '${e.responsable!.prenom} ${e.responsable!.nom}' 
+              : 'Aucun responsable')
+          .toSet()
+          .toList();
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.red),
+        ),
+        child: DropdownButton<String>(
+          value: controller.selectedResponsable.value,
+          hint: const Text('Filtrer par responsable'),
+          underline: const SizedBox(),
+          icon: const Icon(Icons.filter_list, color: Colors.red),
+          items: [
+            const DropdownMenuItem(
+              value: null,
+              child: Text('Tous les responsables'),
+            ),
+            ...responsables.map((responsable) => DropdownMenuItem(
+                  value: responsable,
+                  child: Text(responsable),
+                )),
+          ],
+          onChanged: (value) {
+            controller.selectedResponsable.value = value;
+            controller.filterEmployees();
+          },
+        ),
+      );
+    });
   }
 
   Widget _buildEmptyState() {
@@ -256,7 +438,7 @@ Future<void> _loadChefsEquipe() async {
   }
 
   Widget _buildEmployeeTable() {
-    return Card(
+    return Obx(() => Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -274,7 +456,7 @@ Future<void> _loadChefsEquipe() async {
             DataColumn(label: Text('Solde congés')),
             DataColumn(label: Text('Actions')),
           ],
-          rows: _filteredEmployees.map((employee) {
+          rows: controller.filteredEmployees.map((employee) {
             return DataRow(
               cells: [
                 DataCell(Text(employee.nom)),
@@ -288,6 +470,7 @@ Future<void> _loadChefsEquipe() async {
                       : 'Aucun responsable',
                   ),
                 ),
+                
                 DataCell(_buildSoldeConges(employee)),
                 DataCell(_buildActionButtons(employee)),
               ],
@@ -295,33 +478,14 @@ Future<void> _loadChefsEquipe() async {
           }).toList(),
         ),
       ),
-    );
+    ));
   }
 
-  Widget _buildResponsableDropdown(Employe employee) {
-    return DropdownButton<String>(
-      value: _selectedChefs[employee.id],
-      hint: const Text('Sélectionner'),
-      items: [
-        const DropdownMenuItem(
-          value: null,
-          child: Text('Aucun responsable'),
-        ),
-        ..._chefsEquipe.map((chef) => DropdownMenuItem(
-              value: chef.id,
-              child: Text('${chef.prenom} ${chef.nom}'),
-            ))
-      ],
-      onChanged: (newValue) async {
-        setState(() => _selectedChefs[employee.id] = newValue);
-        await _assignChefEquipe(employee.id, newValue);
-      },
-    );
-  }
+
 
   Widget _buildSoldeConges(Employe employee) {
     return FutureBuilder<int>(
-      future: _demandeService.getSoldeConges(employee.id),
+      future: controller._demandeService.getSoldeConges(employee.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
@@ -365,62 +529,12 @@ Future<void> _loadChefsEquipe() async {
     );
   }
 
-  Future<void> _exportToPDF() async {
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Table(
-            border: pw.TableBorder.all(),
-            children: [
-              pw.TableRow(
-                children: [
-                  pw.Text('Nom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Prénom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Email', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Matricule', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Responsable', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Solde congés', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                ],
-              ),
-              ..._filteredEmployees.map((employee) => pw.TableRow(
-                    children: [
-                      pw.Text(employee.nom),
-                      pw.Text(employee.prenom),
-                      pw.Text(employee.email),
-                      pw.Text(employee.matricule),
-                      pw.Text(
-                        employee.responsable != null
-                          ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
-                          : 'Aucun responsable'
-                      ),
-                      pw.Text('${_demandeService.getSoldeConges(employee.id)} jours'),
-                    ],
-                  )),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
-
   void _showEmployeeDetails(Employe employee) async {
     try {
-      final [absences, solde] = await Future.wait([
-        _pointageService.getNombreAbsences(employee.id),
-        _demandeService.getSoldeConges(employee.id),
-      ]);
+      final solde = await controller._demandeService.getSoldeConges(employee.id);
 
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
+      Get.dialog(
+        AlertDialog(
           title: Text('Détails de ${employee.prenom} ${employee.nom}'),
           content: SingleChildScrollView(
             child: Column(
@@ -430,14 +544,14 @@ Future<void> _loadChefsEquipe() async {
                 _buildDetailRow('Prénom', employee.prenom),
                 _buildDetailRow('Email', employee.email),
                 _buildDetailRow('Matricule', employee.matricule),
-                _buildDetailRow('Date naissance', _formatDate(employee.datedenaissance)),
+                _buildDetailRow('Date naissance', controller.formatDate(employee.datedenaissance)),
                 _buildDetailRow(
                   'Responsable', 
                   employee.responsable != null
                     ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
                     : 'Aucun responsable'
                 ),
-                _buildDetailRow('Absences', absences.toString()),
+               
                 _buildDetailRow(
                   'Solde congés', 
                   '$solde jours',
@@ -449,22 +563,18 @@ Future<void> _loadChefsEquipe() async {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Get.back(),
               child: const Text('Fermer'),
             ),
             TextButton(
-              onPressed: () => _exportEmployeeToPDF(employee, absences, solde),
+              onPressed: () => controller.exportEmployeeToPDF(employee, solde),
               child: const Text('Exporter PDF'),
             ),
           ],
         ),
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
-      }
+      Get.snackbar('Erreur', e.toString());
     }
   }
 
@@ -492,221 +602,143 @@ Future<void> _loadChefsEquipe() async {
     );
   }
 
-  Future<void> _exportEmployeeToPDF(Employe employee, int absences, int solde) async {
-    final pdf = pw.Document();
+  void _editEmployee(Employe employee) {
+    final nomController = TextEditingController(text: employee.nom);
+    final prenomController = TextEditingController(text: employee.prenom);
+    final emailController = TextEditingController(text: employee.email);
+    final matriculeController = TextEditingController(text: employee.matricule);
+    DateTime initialDate = employee.datedenaissance.isNotEmpty
+        ? DateTime.parse(employee.datedenaissance)
+        : DateTime.now();
+    String? selectedChefId = employee.responsable?.id;
 
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            children: [
-              pw.Header(
-                level: 0,
-                child: pw.Text('Fiche Employé', 
-                    style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          DateTime? selectedDate = initialDate;
+          
+          return AlertDialog(
+            title: Text('Modifier ${employee.prenom} ${employee.nom}'),
+            content: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextField(
+                    controller: nomController,
+                    decoration: const InputDecoration(labelText: 'Nom'),
+                  ),
+                  TextField(
+                    controller: prenomController,
+                    decoration: const InputDecoration(labelText: 'Prénom'),
+                  ),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  TextField(
+                    controller: matriculeController,
+                    decoration: const InputDecoration(labelText: 'Matricule'),
+                  ),
+                  ListTile(
+                    title: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => selectedDate = picked);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Responsable (Chef d\'équipe):',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                  Obx(() => DropdownButton<String>(
+                    value: selectedChefId,
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Aucun responsable'),
+                      ),
+                      ...controller.chefsEquipe.map((chef) => DropdownMenuItem(
+                        value: chef.id,
+                        child: Text('${chef.prenom} ${chef.nom}'),
+                      )).toList(),
+                    ],
+                    onChanged: (newValue) {
+                      setState(() => selectedChefId = newValue);
+                    },
+                  )),
+                ],
               ),
-              pw.SizedBox(height: 20),
-              _buildPdfDetailRow('Nom', employee.nom),
-              _buildPdfDetailRow('Prénom', employee.prenom),
-              _buildPdfDetailRow('Email', employee.email),
-              _buildPdfDetailRow('Matricule', employee.matricule),
-              _buildPdfDetailRow(
-                'Responsable', 
-                employee.responsable != null
-                  ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
-                  : 'Aucun responsable'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Annuler'),
               ),
-              _buildPdfDetailRow('Absences', absences.toString()),
-              _buildPdfDetailRow('Solde congés', '$solde jours'),
-              pw.SizedBox(height: 20),
-              pw.Text('Généré le ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
-                  style: const pw.TextStyle(fontSize: 10)),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await controller._employeService.updateEmployee(employee.id, {
+                      'nom': nomController.text,
+                      'prenom': prenomController.text,
+                      'email': emailController.text,
+                      'matricule': matriculeController.text,
+                      'datedenaissance': selectedDate?.toIso8601String(),
+                    });
+                    
+                    if (selectedChefId != employee.responsable?.id) {
+                      await controller.assignChefEquipe(
+                        employee.id, 
+                        selectedChefId
+                      );
+                    }
+                    
+                    Get.snackbar('Succès', 'Employé mis à jour',
+                        backgroundColor: Colors.green);
+                    await controller.loadEmployees();
+                    Get.back();
+                  } catch (e) {
+                    Get.snackbar('Erreur', e.toString(),
+                        backgroundColor: Colors.red);
+                  }
+                },
+                child: const Text('Enregistrer'),
+              ),
             ],
           );
         },
       ),
     );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
   }
-
-  pw.Widget _buildPdfDetailRow(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 10),
-      child: pw.Row(
-        children: [
-          pw.SizedBox(
-            width: 100,
-            child: pw.Text('$label:'),
-          ),
-          pw.Text(value),
-        ],
-      ),
-    );
-  }
-
-  void _editEmployee(Employe employee) {
-  final nomController = TextEditingController(text: employee.nom);
-  final prenomController = TextEditingController(text: employee.prenom);
-  final emailController = TextEditingController(text: employee.email);
-  final matriculeController = TextEditingController(text: employee.matricule);
-  DateTime initialDate = employee.datedenaissance.isNotEmpty
-      ? DateTime.parse(employee.datedenaissance)
-      : DateTime.now();
-  String? selectedChefId = employee.responsable?.id;
-
-  showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
-        DateTime? selectedDate = initialDate;
-        
-        return AlertDialog(
-          title: Text('Modifier ${employee.prenom} ${employee.nom}'),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextField(
-                  controller: nomController,
-                  decoration: const InputDecoration(labelText: 'Nom'),
-                ),
-                TextField(
-                  controller: prenomController,
-                  decoration: const InputDecoration(labelText: 'Prénom'),
-                ),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                ),
-                TextField(
-                  controller: matriculeController,
-                  decoration: const InputDecoration(labelText: 'Matricule'),
-                ),
-                ListTile(
-                  title: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => selectedDate = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Text('Responsable (Chef d\'équipe):',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-                DropdownButton<String>(
-                  value: selectedChefId,
-                  isExpanded: true,
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Aucun responsable'),
-                    ),
-                    ..._chefsEquipe.map((chef) => DropdownMenuItem(
-                      value: chef.id,
-                      child: Text('${chef.prenom} ${chef.nom}'),
-                    )).toList(),
-                  ],
-                  onChanged: (newValue) {
-                    setState(() => selectedChefId = newValue);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () async {
-                try {
-                  // Mettre à jour les informations de base
-                  await _employeService.updateEmployee(employee.id, {
-                    'nom': nomController.text,
-                    'prenom': prenomController.text,
-                    'email': emailController.text,
-                    'matricule': matriculeController.text,
-                    'datedenaissance': selectedDate?.toIso8601String(),
-                  });
-                  
-                  // Mettre à jour le responsable si nécessaire
-                  if (selectedChefId != employee.responsable?.id) {
-                    await _employeService.assignerResponsable(
-                      employee.id, 
-                      selectedChefId
-                    );
-                  }
-                  
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Employé mis à jour'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await _loadEmployees();
-                  Navigator.pop(context);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Enregistrer'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
 
   void _deleteEmployee(Employe employee) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+    Get.dialog(
+      AlertDialog(
         title: Text('Supprimer ${employee.prenom} ${employee.nom}?'),
         content: const Text('Cette action est irréversible. Confirmer?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Get.back(),
             child: const Text('Annuler'),
           ),
           TextButton(
             onPressed: () async {
               try {
-                await _employeService.deleteEmployee(employee.id);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Employé supprimé'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                await _loadEmployees();
+                await controller._employeService.deleteEmployee(employee.id);
+                Get.snackbar('Succès', 'Employé supprimé',
+                    backgroundColor: Colors.green);
+                await controller.loadEmployees();
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                Get.snackbar('Erreur', e.toString(),
+                    backgroundColor: Colors.red);
               } finally {
-                if (!mounted) return;
-                Navigator.pop(context);
+                Get.back();
               }
             },
             child: const Text('Supprimer', style: TextStyle(color: Colors.red)),

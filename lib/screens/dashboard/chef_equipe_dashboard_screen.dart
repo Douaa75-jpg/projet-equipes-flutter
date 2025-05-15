@@ -4,7 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import '../../AuthProvider.dart';
+import '../../auth_controller.dart';
 import '../../services/chef_equipe_service.dart';
 import '../../services/demande_service.dart';
 import '../../screens/employe_pointage_history_screen.dart';
@@ -39,8 +39,8 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboard> {
   Future<void> _loadEmployes() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final employes = await _chefEquipeService.getHeuresTravailTousLesEmployes(authProvider.userId!);
-      final nombre = await _chefEquipeService.getNombreEmployesSousResponsable(authProvider.userId!);
+      final employes = await _chefEquipeService.getHeuresTravailTousLesEmployes(authProvider.userId.value);
+      final nombre = await _chefEquipeService.getNombreEmployesSousResponsable(authProvider.userId.value);
       
       setState(() {
         _employes = employes['employes'];
@@ -60,8 +60,8 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboard> {
       setState(() => _isLoadingConges = true);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      final congesEnCours = await _demandeService.getTeamLeaveRequests(authProvider.userId!);
-      final congesAVenir = await _demandeService.getUpcomingTeamLeaveRequests(authProvider.userId!);
+      final congesEnCours = await _demandeService.getTeamLeaveRequests(authProvider.userId.value);
+      final congesAVenir = await _demandeService.getUpcomingTeamLeaveRequests(authProvider.userId.value);
       
       setState(() {
         _congesEnCours = congesEnCours;
@@ -152,7 +152,7 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboard> {
       MaterialPageRoute(
         builder: (context) => EmployePointageHistoryScreen(
           employeId: employeId,
-          chefId: authProvider.userId!,
+          chefId: authProvider.userId.value,
         ),
       ),
     );

@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../auth_controller.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../services/pointage_service.dart';
-import '../../services/notification_service.dart';
 import '../../services/demande_service.dart';
 import '../layoutt/employee_layout.dart';
 import '../../services/Employe_Service.dart';
@@ -13,7 +12,6 @@ import '../../services/Employe_Service.dart';
 class EmployeeDashboardController extends GetxController {
   final PointageService _pointageService = Get.find();
   final DemandeService _demandeService = Get.find();
-  final NotificationService _notificationService = Get.find();
 
   final RxMap<String, dynamic> pointageStatus = <String, dynamic>{}.obs;
   final RxMap<String, dynamic> heuresTravail = <String, dynamic>{}.obs;

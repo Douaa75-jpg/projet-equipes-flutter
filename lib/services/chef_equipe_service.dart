@@ -13,39 +13,9 @@ class ChefEquipeService {
       'Authorization': 'Bearer $token',
     };
   }
-
-  Future<Map<String, dynamic>> getHeuresEquipe(String chefId) async {
-    final url = Uri.parse('$_baseUrl/heures-equipe/$chefId');
-    final response = await http.get(url, headers: await _getHeaders());
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Échec du chargement des heures d\'équipe: ${response.statusCode}');
-    }
-  }
-
-  Future<Map<String, dynamic>> getHeuresTravailTousLesEmployes(
-    String chefId, {
-    String? dateDebut,
-    String? dateFin,
-  }) async {
-    final url = Uri.parse('$_baseUrl/heures-travail-equipe/$chefId')
-        .replace(queryParameters: {
-      if (dateDebut != null) 'dateDebut': dateDebut,
-      if (dateFin != null) 'dateFin': dateFin,
-    });
-
-    final response = await http.get(url, headers: await _getHeaders());
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Échec du chargement des heures de travail: ${response.statusCode}');
-    }
-  }
-
-  Future<Map<String, dynamic>> getHistoriqueEquipe(
+ 
+//pour recuperer l'historique de pointage de chaque employe
+   Future<Map<String, dynamic>> getHistoriqueEquipe(
     String chefId, {
     String? dateDebut,
     String? dateFin,
@@ -73,53 +43,77 @@ class ChefEquipeService {
     }
   }
 
-  Future<List<dynamic>> getEmployesList() async {
-    final url = Uri.parse('$_baseUrl/employes');
-    final response = await http.get(url, headers: await _getHeaders());
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Échec du chargement de la liste des employés: ${response.statusCode}');
+Future<Map<String, dynamic>> getEmployeInfo(String employeId) async {
+  try {
+    if (employeId.isEmpty) {
+      throw Exception('ID employé vide');
     }
-  }
 
-  Future<Map<String, dynamic>> getHeuresJournalieres(
-      String employeId, String date) async {
-    final url = Uri.parse('$_baseUrl/heures-journalieres/$employeId')
-        .replace(queryParameters: {'date': date});
-
-    final response = await http.get(url, headers: await _getHeaders());
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Échec du chargement des heures journalières: ${response.statusCode}');
-    }
-  }
-
-  Future<Map<String, dynamic>> getEmployeInfo(String employeId) async {
     final url = Uri.parse('$_baseUrl/employe-info/$employeId');
     final response = await http.get(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else if (response.statusCode == 404) {
-      throw Exception('Employé non trouvé');
+      throw Exception('Employé non trouvé (ID: $employeId)');
     } else {
-      throw Exception('Échec du chargement des informations de l\'employé: ${response.statusCode}');
+      throw Exception('Erreur serveur: ${response.statusCode} - ${response.body}');
     }
+  } catch (e) {
+    throw Exception('Erreur lors de la récupération des infos employé: $e');
   }
+}
 
-  Future<int> getNombreEmployesSousResponsable(String chefId) async {
-  final url = Uri.parse('$_baseUrl/$chefId/nombre-employes');
-  final response = await http.get(url, headers: await _getHeaders());
+//pour recuperer la liste d'employe sous responsable avec son solde et nbr d'absence 
+ Future<List<dynamic>> getHeuresEquipe(String chefId) async {
+  try {
+    final url = Uri.parse('$_baseUrl/heures-equipe/$chefId');
+    final response = await http.get(url, headers: await _getHeaders());
 
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    return data['nombreEmployes'] as int;
-  } else {
-    throw Exception('Échec du chargement du nombre d\'employés: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      // Assure que nous retournons toujours une List même si un seul élément
+      return data is List ? data : [data];
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur lors de la récupération des heures de l\'équipe: $e');
+  }
+}
+
+
+//pour recuperer les nombre d'employe sous ce responsable 
+Future<int> getNombreEmployesSousResponsable(String chefId) async {
+  try {
+    final url = Uri.parse('$_baseUrl/$chefId/nombre-employes');
+    final response = await http.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['nombreEmployes'] as int;
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur lors du comptage des employés: $e');
+  }
+}
+
+
+//pour recuperer les nombre des employe present ce jour
+Future<Map<String, dynamic>> getPresencesSousChefAujourdhui(String chefId) async {
+  try {
+    final url = Uri.parse('$_baseUrl/presences-sous-chef/$chefId/stats-jour');
+    final response = await http.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Erreur ${response.statusCode}: ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Erreur lors de la récupération des présences: $e');
   }
 }
 }

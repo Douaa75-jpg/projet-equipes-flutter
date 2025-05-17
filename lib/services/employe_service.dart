@@ -12,6 +12,32 @@ class EmployeService extends GetxController {
   var errorMessage = ''.obs;
 
 
+// في Employe_Service.dart
+Future<int> getNombreAbsences(String employeId) async {
+  try {
+    isLoading(true);
+    errorMessage('');
+    
+    final response = await http.get(
+      Uri.parse('$baseUrl/$employeId/calculate-absences'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final result = json.decode(response.body);
+      return result['nbAbsences'] ?? 0;
+    } else {
+      return 0;
+    }
+  } catch (e) {
+    errorMessage('Erreur lors de la récupération des absences: $e');
+    return 0;
+  } finally {
+    isLoading(false);
+  }
+}
+
+
   // في Employe_Service.dart
 Future<Map<String, dynamic>> calculerEtMettreAJourAbsences(String employeId) async {
   try {
@@ -205,7 +231,7 @@ class Employe {
       prenom: json['utilisateur']['prenom'] ?? '',
       email: json['utilisateur']['email'] ?? '',
       matricule: json['utilisateur']['matricule'] ?? '',
-      datedenaissance: json['utilisateur']['datedenaissance'] ?? '',
+      datedenaissance: json['utilisateur']['datedenaissance']?.toString() ?? '',
       responsable: json['responsable'] != null
           ? Responsable.fromJson(json['responsable'])
           : null,

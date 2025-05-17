@@ -1,99 +1,147 @@
+// lib/screens/auth/reset_password_screen.dart
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:gestion_equipe_flutter/services/auth_service.dart';
+import 'package:gestion_equipe_flutter/screens/auth/login_screen.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
+class ResetPasswordScreen extends StatelessWidget {
+  final AuthService authService = Get.find();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  var isLoading = false.obs;
+  var isPasswordVisible = false.obs;
+  var isConfirmPasswordVisible = false.obs;
   final String token;
-  
-  const ResetPasswordScreen({Key? key, required this.token}) : super(key: key);
 
-  @override
-  _ResetPasswordScreenState createState() => _ResetPasswordScreenState();
-}
+  ResetPasswordScreen({Key? key, required this.token}) : super(key: key);
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final AuthService _authService = AuthService();
-  bool _isLoading = false;
-  bool _success = false;
+  String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Veuillez entrer un mot de passe';
+    }
+    if (value.length < 8) {
+      return 'Le mot de passe doit contenir au moins 8 caractères';
+    }
+    return null;
+  }
+
+  String? validateConfirmPassword(String? value) {
+    if (value != passwordController.text) {
+      return 'Les mots de passe ne correspondent pas';
+    }
+    return null;
+  }
+
+  Future<void> resetPassword() async {
+    if (!formKey.currentState!.validate()) return;
+    
+    isLoading.value = true;
+    
+    try {
+      await authService.resetPassword(
+        token,
+        passwordController.text,
+      );
+      
+      Get.snackbar(
+        'Succès',
+        'Votre mot de passe a été réinitialisé avec succès',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      
+      await Future.delayed(const Duration(seconds: 2));
+      Get.offAll(() => LoginScreen());
+    } catch (e) {
+      Get.snackbar(
+        'Erreur',
+        e.toString(),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Réinitialisation')),
+      appBar: AppBar(
+        title: const Text('Réinitialiser le mot de passe'),
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
-          key: _formKey,
+          key: formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Nouveau mot de passe'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un mot de passe';
-                  }
-                  if (value.length < 8) {
-                    return '8 caractères minimum';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirmer le mot de passe'),
-                validator: (value) {
-                  if (value != _passwordController.text) {
-                    return 'Les mots de passe ne correspondent pas';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 20),
+              const Text(
+                'Créer un nouveau mot de passe',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              if (_success)
-                const Text(
-                  'Mot de passe réinitialisé avec succès',
-                  style: TextStyle(color: Colors.green),
-                ),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _resetPassword,
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Réinitialiser'),
+              const Text(
+                'Votre nouveau mot de passe doit être différent des précédents',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
               ),
+              const SizedBox(height: 30),
+              Obx(() => TextFormField(
+                controller: passwordController,
+                obscureText: !isPasswordVisible.value,
+                decoration: InputDecoration(
+                  labelText: 'Nouveau mot de passe',
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(isPasswordVisible.value
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    onPressed: () => isPasswordVisible.toggle(),
+                  ),
+                  border: const OutlineInputBorder(),
+                ),
+                validator: validatePassword,
+              )),
+              const SizedBox(height: 20),
+              Obx(() => TextFormField(
+                controller: confirmPasswordController,
+                obscureText: !isConfirmPasswordVisible.value,
+                decoration: InputDecoration(
+                  labelText: 'Confirmer le mot de passe',
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(isConfirmPasswordVisible.value
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    onPressed: () => isConfirmPasswordVisible.toggle(),
+                  ),
+                  border: const OutlineInputBorder(),
+                ),
+                validator: validateConfirmPassword,
+              )),
+              const SizedBox(height: 30),
+              Obx(() => ElevatedButton(
+                onPressed: isLoading.value ? null : resetPassword,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: const Color(0xFFD32F2F),
+                ),
+                child: isLoading.value
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Réinitialiser le mot de passe',
+                        style: TextStyle(color: Colors.white),
+                      ),
+              )),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Future<void> _resetPassword() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-        _success = false;
-      });
-
-      try {
-        await _authService.resetPassword(
-          widget.token,
-          _passwordController.text,
-        );
-        setState(() => _success = true);
-        await Future.delayed(const Duration(seconds: 2));
-        Navigator.pop(context);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      } finally {
-        setState(() => _isLoading = false);
-      }
-    }
   }
 }

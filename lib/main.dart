@@ -25,6 +25,8 @@ import 'services/notification_service.dart';
 import './screens/leave/gestion_demande__Screen.dart';
 import 'locales/translation_service.dart'; // Import du service de traduction
 import './services/Employe_Service.dart';
+import './screens/choice_screen.dart';
+import './services/chef_equipe_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,6 +90,7 @@ Future<void> initializeServices() async {
     Get.put(RhService());
     Get.put(DemandeService());
     Get.put(EmployeService());
+    Get.put(ChefEquipeService());
 
     // NotificationService avec persistance locale
     Get.put(NotificationService());
@@ -118,7 +121,7 @@ class MyApp extends StatelessWidget {
       translations: TranslationService(), // Ajout du service de traduction
       locale: _getLocale(), // Langue par défaut ou celle sauvegardée
       fallbackLocale: const Locale('fr', 'FR'), // Langue de repli
-      home: const AuthWrapper(),
+      home: const ChoiceScreen(),
       supportedLocales: const [
         Locale('en', 'US'),
         Locale('ar', 'AE'),
@@ -137,14 +140,16 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/deconnexion', page: () => const DeconnexionScreen()),
         GetPage(name: '/register', page: () => RegisterPage()),
         GetPage(
-            name: '/forgot-password', page: () => const ForgotPasswordScreen()),
-        GetPage(
+          name: '/forgot-password', 
+          page: () => ForgotPasswordScreen()
+        ),
+         GetPage(
           name: '/reset-password',
           page: () {
-            final args = Get.arguments as Map<String, dynamic>?;
-            final token = args?['token'] as String?;
-            return token != null
-                ? ResetPasswordScreen(token: token)
+            final args = Get.parameters;
+            final token = args['token'];
+            return token != null 
+                ? ResetPasswordScreen(token: token) 
                 : LoginScreen();
           },
         ),

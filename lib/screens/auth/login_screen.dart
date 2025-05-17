@@ -9,6 +9,7 @@ import 'package:gestion_equipe_flutter/screens/acceuil/accueil_employe.dart';
 import '../auth/registre_screen.dart';
 import '../acceuil/Accueil_RH.dart';
 import '../../auth_controller.dart';
+import 'package:flutter/animation.dart';
 
 enum TypeResponsable { chefEquipe, rh }
 

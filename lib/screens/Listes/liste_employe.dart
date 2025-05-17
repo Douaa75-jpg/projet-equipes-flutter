@@ -9,6 +9,7 @@ import '../../services/pointage_service.dart';
 import '../../services/demande_service.dart';
 import '../layoutt/rh_layout.dart';
 import '../../services/notification_service.dart';
+import 'HeuresTravailScreen.dart';
 
 class ListeEmployeController extends GetxController {
   final EmployeService _employeService = Get.put(EmployeService());
@@ -22,6 +23,7 @@ class ListeEmployeController extends GetxController {
   var searchQuery = ''.obs;
   var selectedResponsable = Rxn<String>();
   var isLoading = true.obs;
+  var absencesCount = <String, int>{}.obs;
 
   @override
   void onInit() {
@@ -29,10 +31,22 @@ class ListeEmployeController extends GetxController {
     loadData();
   }
 
+  Future<void> loadAbsencesCount() async {
+  try {
+    for (var employee in employees) {
+      final count = await _employeService.getNombreAbsences(employee.id);
+      absencesCount[employee.id] = count;
+    }
+  } catch (e) {
+    Get.snackbar('Erreur', 'Erreur de chargement des absences: ${e.toString()}');
+  }
+}
+
   Future<void> loadData() async {
     try {
       isLoading(true);
       await Future.wait([loadEmployees(), loadChefsEquipe()]);
+      await loadAbsencesCount();
     } catch (e) {
       Get.snackbar('Erreur', 'Erreur de chargement: ${e.toString()}');
     } finally {
@@ -89,16 +103,36 @@ class ListeEmployeController extends GetxController {
     }).toList());
   }
 
-  String formatDate(String dateString) {
-    try {
-      if (dateString.isEmpty) return 'Non spécifié';
-      return DateFormat('dd/MM/yyyy').format(DateTime.parse(dateString));
-    } catch (e) {
-      return dateString;
+String formatDate(String dateString) {
+  try {
+    if (dateString.isEmpty || dateString.toLowerCase() == "null") return 'Non spécifié';
+    
+    // Essayez différents formats de date
+    DateTime? date;
+    
+    // Format ISO 8601 (2023-12-31T00:00:00.000Z)
+    date = DateTime.tryParse(dateString);
+    if (date != null) return DateFormat('dd/MM/yyyy').format(date);
+    
+    // Format simple (2023-12-31)
+    final parts = dateString.split('-');
+    if (parts.length == 3) {
+      date = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+      return DateFormat('dd/MM/yyyy').format(date);
     }
+    
+    return 'Non spécifié';
+  } catch (e) {
+    debugPrint('Erreur de format de date: $e');
+    return 'Non spécifié';
   }
+}
 
   Future<void> exportToPDF() async {
+    final soldesConges = <String, int>{};
+    for (var employee in filteredEmployees) { 
+      soldesConges[employee.id] = await _demandeService.getSoldeConges(employee.id);
+    }
     final pdf = pw.Document();
 
     // Ajout de l'en-tête avec logo et informations
@@ -138,35 +172,89 @@ class ListeEmployeController extends GetxController {
               ),
               pw.SizedBox(height: 10),
               pw.Table(
-                border: pw.TableBorder.all(),
-                children: [
-                  pw.TableRow(
+              border: pw.TableBorder.all(width: 1),
+              columnWidths: {
+                0: pw.FlexColumnWidth(1.5),
+                1: pw.FlexColumnWidth(1.5),
+                2: pw.FlexColumnWidth(3),
+                3: pw.FlexColumnWidth(2),
+                4: pw.FlexColumnWidth(3),
+                5: pw.FlexColumnWidth(2),
+                6: pw.FlexColumnWidth(2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                  children: [
+                    for (var header in [
+                      'Nom',
+                      'Prénom',
+                      'Email',
+                      'Matricule',
+                      'Responsable',
+                      'Solde congés',
+                      'Absences'
+                    ])
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text(
+                          header,
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                ...filteredEmployees.map(
+                  (employee) => pw.TableRow(
                     children: [
-                      pw.Text('Nom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Prénom', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Email', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Matricule', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Responsable', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('Solde congés', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(employee.nom, style: const pw.TextStyle(fontSize: 10)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(employee.prenom, style: const pw.TextStyle(fontSize: 10)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(employee.email, style: const pw.TextStyle(fontSize: 10)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(employee.matricule, style: const pw.TextStyle(fontSize: 10)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          employee.responsable != null
+                              ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
+                              : 'Aucun responsable',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                      ),
+                       pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          '${soldesConges[employee.id] ?? 0} jours',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                          '${absencesCount[employee.id] ?? 0} jours',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                      ),
                     ],
                   ),
-                  ...filteredEmployees.map((employee) => pw.TableRow(
-                        children: [
-                          pw.Text(employee.nom),
-                          pw.Text(employee.prenom),
-                          pw.Text(employee.email),
-                          pw.Text(employee.matricule),
-                          pw.Text(
-                            employee.responsable != null
-                              ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
-                              : 'Aucun responsable'
-                          ),
-                          
-                          pw.Text('${_demandeService.getSoldeConges(employee.id)} jours'),
-                        ],
-                      )),
-                ],
-              ),
+                ),
+              ],
+            ),
+
               pw.SizedBox(height: 30),
               // Signature et date
               pw.Row(
@@ -259,6 +347,7 @@ class ListeEmployeController extends GetxController {
               ),
               
               buildPdfDetailRow('Solde congés', '$solde jours'),
+              buildPdfDetailRow('Nombre d\'absences', '${absencesCount[employee.id] ?? 0} jours'),
               pw.SizedBox(height: 30),
               // Signature et date
               pw.Row(
@@ -454,6 +543,7 @@ class ListeEmployeScreen extends StatelessWidget {
             DataColumn(label: Text('Matricule')),
             DataColumn(label: Text('Responsable')),
             DataColumn(label: Text('Solde congés')),
+            DataColumn(label: Text('Absences')),
             DataColumn(label: Text('Actions')),
           ],
           rows: controller.filteredEmployees.map((employee) {
@@ -472,6 +562,7 @@ class ListeEmployeScreen extends StatelessWidget {
                 ),
                 
                 DataCell(_buildSoldeConges(employee)),
+                DataCell(_buildAbsencesCount(employee)),
                 DataCell(_buildActionButtons(employee)),
               ],
             );
@@ -482,7 +573,18 @@ class ListeEmployeScreen extends StatelessWidget {
   }
 
 
-
+Widget _buildAbsencesCount(Employe employee) {
+  return Obx(() {
+    final count = controller.absencesCount[employee.id] ?? 0;
+    return Text(
+      '$count jours',
+      style: TextStyle(
+        color: count > 3 ? Colors.red : Colors.grey, // تغيير اللون إذا زادت الغيابات عن 3 أيام
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  });
+}
   Widget _buildSoldeConges(Employe employee) {
     return FutureBuilder<int>(
       future: controller._demandeService.getSoldeConges(employee.id),
@@ -507,30 +609,42 @@ class ListeEmployeScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(Employe employee) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.info_outline),
-          color: Colors.blue,
-          onPressed: () => _showEmployeeDetails(employee),
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      IconButton(
+        icon: const Icon(Icons.access_time),
+        color: Colors.blueGrey,
+        onPressed: () => Get.to(
+          () => HeuresTravailScreen(
+            employeId: employee.id,
+            employeNom: employee.nom,
+            employePrenom: employee.prenom,
+          ),
         ),
-        IconButton(
-          icon: const Icon(Icons.edit),
-          color: Colors.orange,
-          onPressed: () => _editEmployee(employee),
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete_outline),
-          color: Colors.red,
-          onPressed: () => _deleteEmployee(employee),
-        ),
-      ],
-    );
-  }
+      ),
+      IconButton(
+        icon: const Icon(Icons.info_outline),
+        color: Colors.blue,
+        onPressed: () => _showEmployeeDetails(employee),
+      ),
+      IconButton(
+        icon: const Icon(Icons.edit),
+        color: Colors.orange,
+        onPressed: () => _editEmployee(employee),
+      ),
+      IconButton(
+        icon: const Icon(Icons.delete_outline),
+        color: Colors.red,
+        onPressed: () => _deleteEmployee(employee),
+      ),
+    ],
+  );
+}
 
   void _showEmployeeDetails(Employe employee) async {
     try {
+      
       final solde = await controller._demandeService.getSoldeConges(employee.id);
 
       Get.dialog(
@@ -544,14 +658,21 @@ class ListeEmployeScreen extends StatelessWidget {
                 _buildDetailRow('Prénom', employee.prenom),
                 _buildDetailRow('Email', employee.email),
                 _buildDetailRow('Matricule', employee.matricule),
-                _buildDetailRow('Date naissance', controller.formatDate(employee.datedenaissance)),
-                _buildDetailRow(
-                  'Responsable', 
-                  employee.responsable != null
+                _buildDetailRow('Date naissance', employee.datedenaissance.isNotEmpty 
+                  ? controller.formatDate(employee.datedenaissance)
+                  : 'Non spécifié'
+              ),
+                _buildDetailRow('Responsable', employee.responsable != null
                     ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
                     : 'Aucun responsable'
                 ),
-               
+               // إضافة سطر لعرض عدد الغيابات
+                _buildDetailRow(
+                  'Nombre d\'absences', 
+                  '${controller.absencesCount[employee.id] ?? 0} jours',
+                  isImportant: true,
+                  color: (controller.absencesCount[employee.id] ?? 0) > 3 ? Colors.red : Colors.grey,
+                ),
                 _buildDetailRow(
                   'Solde congés', 
                   '$solde jours',

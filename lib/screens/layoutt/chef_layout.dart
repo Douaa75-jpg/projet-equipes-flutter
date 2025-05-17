@@ -230,16 +230,16 @@ class _ChefLayoutState extends State<ChefLayout> {
   }
 
   void _navigateToRoute(BuildContext context, String route) {
-    setState(() {
-      _currentRoute = route;
-    });
+  setState(() {
+    _currentRoute = route;
+  });
 
-    if (route == '/Accueilchef') {
-      Get.offAll(() => const Accueilchef());
-    } else if (route == '/dashboard') {
-      Get.offAll(() => ChefEquipeDashboard());
-    }
+  if (route == '/Accueilchef') {
+    Get.offAll(() => const Accueilchef());
+  } else if (route == '/dashboard') {
+    Get.offAll(() => ChefEquipeDashboardScreen()); // Changed from Controller to Screen
   }
+}
 
   Widget _buildNavItem(BuildContext context, String title, String route) {
     final isActive = _currentRoute == route;

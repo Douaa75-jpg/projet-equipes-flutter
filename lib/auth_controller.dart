@@ -25,45 +25,48 @@ class AuthProvider extends GetxController {
   }
 
    Future<void> checkAuthStatus() async {
-    try {
-      final storedToken = await _storage.read(key: 'jwt_token');
-      debugPrint('Retrieved token from storage: $storedToken');
-      
-      if (storedToken == null || storedToken.isEmpty) {
-        debugPrint('No token found in storage');
-        isAuthenticated.value = false;
-        return;
-      }
-
-      if (JwtDecoder.isExpired(storedToken)) {
-        debugPrint('Token is expired');
-        await logout();
-        return;
-      }
-
-      token.value = storedToken;
-      final Map<String, dynamic> decodedToken = JwtDecoder.decode(storedToken);
-      
-      if (decodedToken['id'] == null) {
-        throw Exception('Invalid token: missing user ID');
-      }
-
-      userId.value = decodedToken['id'].toString();
-      nom.value = decodedToken['nom']?.toString() ?? '';
-      prenom.value = decodedToken['prenom']?.toString() ?? '';
-      email.value = decodedToken['email']?.toString() ?? '';
-      role.value = decodedToken['role']?.toString() ?? '';
-      typeResponsable.value = decodedToken['typeResponsable']?.toString() ?? '';
-      matricule.value = decodedToken['matricule']?.toString() ?? '';
-      datedenaissance.value = decodedToken['datedenaissance']?.toString() ?? '';
-      isAuthenticated.value = true;
-
-      debugPrint('User authenticated successfully: ${email.value}');
-    } catch (e) {
-      debugPrint('Error in checkAuthStatus: $e');
+  try {
+    final storedToken = await _storage.read(key: 'jwt_token');
+    debugPrint('Retrieved token from storage: $storedToken');
+    
+    if (storedToken == null || storedToken.isEmpty) {
+      debugPrint('No token found in storage');
       isAuthenticated.value = false;
+      return;
     }
+
+    if (JwtDecoder.isExpired(storedToken)) {
+      debugPrint('Token is expired');
+      await logout();
+      return;
+    }
+
+    token.value = storedToken;
+    final Map<String, dynamic> decodedToken = JwtDecoder.decode(storedToken);
+    
+    if (decodedToken['id'] == null) {
+      throw Exception('Invalid token: missing user ID');
+    }
+
+    userId.value = decodedToken['id'].toString();
+    // Store the user ID in secure storage
+    await _storage.write(key: 'user_id', value: userId.value); // Add this line
+    
+    nom.value = decodedToken['nom']?.toString() ?? '';
+    prenom.value = decodedToken['prenom']?.toString() ?? '';
+    email.value = decodedToken['email']?.toString() ?? '';
+    role.value = decodedToken['role']?.toString() ?? '';
+    typeResponsable.value = decodedToken['typeResponsable']?.toString() ?? '';
+    matricule.value = decodedToken['matricule']?.toString() ?? '';
+    datedenaissance.value = decodedToken['datedenaissance']?.toString() ?? '';
+    isAuthenticated.value = true;
+
+    debugPrint('User authenticated successfully: ${email.value}');
+  } catch (e) {
+    debugPrint('Error in checkAuthStatus: $e');
+    isAuthenticated.value = false;
   }
+}
 
   Future<Map<String, dynamic>> login(String email, String motDePasse) async {
     final url = Uri.parse('http://localhost:3000/auth/login');
@@ -88,6 +91,7 @@ class AuthProvider extends GetxController {
       isAuthenticated.value = true;
 
       await _storage.write(key: 'jwt_token', value: token.value);
+      await _storage.write(key: 'user_id', value: userId.value);
 
       return {
         'role': role.value,
@@ -111,6 +115,7 @@ class AuthProvider extends GetxController {
     isAuthenticated.value = false;
 
     await _storage.delete(key: 'jwt_token');
+    await _storage.delete(key: 'user_id');
   }
 
   Future<Map<String, dynamic>?> getUserData() async {

@@ -77,23 +77,30 @@ class AuthService extends GetxController {
     }
   }
 
-  Future<void> forgotPassword(String email) async {
-    try {
-      final response = await _dio.post(
-        '/forgot-password',
-        data: {'email': email},
-        options: dio.Options(
-          headers: {'Content-Type': 'application/json'},
-        ),
-      );
+   Future<Map<String, dynamic>> forgotPassword(String email) async {
+  try {
+    final response = await _dio.post(
+      '/forgot-password',
+      data: {'email': email},
+      options: dio.Options(
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
 
-      if (response.statusCode != 200) {
-        throw Exception('Échec de l\'envoi du lien de réinitialisation');
-      }
-    } on dio.DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Erreur de connexion');
+    if (response.statusCode == 200) {
+      return response.data;
+    } else {
+      throw Exception('Échec de l\'envoi du lien de réinitialisation: ${response.statusCode}');
+    }
+  } on dio.DioException catch (e) {
+    if (e.response != null) {
+      throw Exception(e.response?.data['message'] ?? 
+          'Erreur lors de l\'envoi du lien de réinitialisation');
+    } else {
+      throw Exception('Erreur de connexion: ${e.message}');
     }
   }
+}
 
   Future<void> resetPassword(String token, String newPassword) async {
     try {
@@ -111,6 +118,7 @@ class AuthService extends GetxController {
       if (response.statusCode != 200) {
         throw Exception('Échec de la réinitialisation');
       }
+      return response.data;
     } on dio.DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Erreur de connexion');
     }
@@ -155,25 +163,17 @@ class AuthService extends GetxController {
   Future<void> verifyTokenStorage() async {
     try {
       String? storedToken = await _storage.read(key: 'jwt_token');
-      print('Le token stocké: $storedToken');
-
       if (storedToken != null && storedToken.isNotEmpty) {
         if (JwtDecoder.isExpired(storedToken)) {
-          print('Le token est expiré');
           await logout();
         } else {
-          print('Le token est valide');
           token.value = storedToken;
-          
           role.value = await _storage.read(key: 'user_role') ?? '';
           typeResponsable.value = await _storage.read(key: 'user_typeResponsable') ?? '';
           nom.value = await _storage.read(key: 'user_nom') ?? '';
         }
-      } else {
-        print('Aucun token trouvé dans le stockage');
       }
-     } catch (e) {
-      print('Erreur lors de la lecture du token: $e');
+    } catch (e) {
       await logout();
     }
   }

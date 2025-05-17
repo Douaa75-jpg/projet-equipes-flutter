@@ -16,6 +16,7 @@ class RegisterController extends GetxController {
   var datedenaissance = ''.obs;
   var chefsEquipe = <dynamic>[].obs;
   var isLoading = false.obs;
+  var entrepriseCode = ''.obs;
 
   @override
   void onInit() {
@@ -55,6 +56,18 @@ class RegisterController extends GetxController {
       return;
     }
 
+    // Vérification du code entreprise
+    if (entrepriseCode.value != 'ZETABOX2024') {
+      Get.snackbar(
+        'Erreur', 
+        'Code entreprise invalide. Seuls les employés de Zeta Box peuvent s\'inscrire.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+      return;
+    }
+
     final Map<String, dynamic> userData = {
       'nom': nom.value,
       'prenom': prenom.value,
@@ -63,6 +76,7 @@ class RegisterController extends GetxController {
       'role': role.value,
       'matricule': matricule.value,
       'datedenaissance': datedenaissance.value,
+      'entrepriseCode': entrepriseCode.value,
     };
 
     if (role.value == 'RESPONSABLE') {
@@ -79,10 +93,16 @@ class RegisterController extends GetxController {
       );
 
       if (response.statusCode == 201) {
-        Get.snackbar('Succès', 'Utilisateur créé avec succès');
-        Get.back(); // Return to previous screen
+        Get.snackbar(
+          'Succès', 
+          'Utilisateur créé avec succès',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        Get.offAllNamed('/login'); // Redirection vers la page de connexion
       } else {
-        Get.snackbar('Erreur', 'Erreur lors de la création: ${response.body}');
+        final error = json.decode(response.body)['message'] ?? 'Erreur inconnue';
+        Get.snackbar('Erreur', error);
       }
     } catch (e) {
       Get.snackbar('Erreur', 'Problème de connexion: ${e.toString()}');
@@ -94,14 +114,13 @@ class RegisterController extends GetxController {
 
 class RegisterPage extends StatelessWidget {
   final RegisterController controller = Get.put(RegisterController());
+  final primaryColor = Color(0xFF8B0000);
+  final backgroundColor = Color(0xFFF5F5F5);
 
   RegisterPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Color(0xFF8B0000);
-    final backgroundColor = Color(0xFFF5F5F5);
-
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
@@ -157,6 +176,12 @@ class RegisterPage extends StatelessWidget {
                     _buildTextField('Mot de passe', Icons.lock, (val) => controller.motDePasse.value = val!,
                         isPassword: true),
                     _buildTextField('Matricule', Icons.badge, (val) => controller.matricule.value = val ?? ''),
+                    _buildTextField(
+                      'Code Entreprise', 
+                      Icons.business, 
+                      (val) => controller.entrepriseCode.value = val!,
+                      isCodeEntreprise: true,
+                    ),
                     _buildDateField(),
                     const SizedBox(height: 16),
                     _buildRoleDropdown(),
@@ -207,17 +232,25 @@ class RegisterPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTextField(String label, IconData icon, Function(String?) onSaved,
-      {bool isEmail = false, bool isPassword = false}) {
+  Widget _buildTextField(
+    String label, 
+    IconData icon, 
+    Function(String?) onSaved, {
+    bool isEmail = false, 
+    bool isPassword = false,
+    bool isCodeEntreprise = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
+        obscureText: isPassword,
+        keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: Color(0xFF8B0000)),
+          prefixIcon: Icon(icon, color: primaryColor),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Color(0xFF8B0000)),
+            borderSide: BorderSide(color: primaryColor),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -225,13 +258,11 @@ class RegisterPage extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+            borderSide: BorderSide(color: primaryColor, width: 2),
           ),
           filled: true,
           fillColor: Colors.white,
         ),
-        keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
-        obscureText: isPassword,
         validator: (value) {
           if ((value == null || value.isEmpty) && label != 'Matricule') {
             return 'Veuillez entrer $label';
@@ -265,7 +296,7 @@ class RegisterPage extends StatelessWidget {
               return Theme(
                 data: Theme.of(context).copyWith(
                   colorScheme: ColorScheme.light(
-                    primary: Color(0xFF8B0000),
+                    primary: primaryColor,
                     onPrimary: Colors.white,
                     onSurface: Colors.black,
                   ),
@@ -282,10 +313,10 @@ class RegisterPage extends StatelessWidget {
         decoration: InputDecoration(
           labelText: 'Date de naissance',
           hintText: 'AAAA-MM-JJ',
-          prefixIcon: Icon(Icons.calendar_today, color: Color(0xFF8B0000)),
+          prefixIcon: Icon(Icons.calendar_today, color: primaryColor),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Color(0xFF8B0000)),
+            borderSide: BorderSide(color: primaryColor),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -293,11 +324,17 @@ class RegisterPage extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+            borderSide: BorderSide(color: primaryColor, width: 2),
           ),
           filled: true,
           fillColor: Colors.white,
         ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Veuillez sélectionner une date';
+          }
+          return null;
+        },
       ),
     );
   }
@@ -320,10 +357,10 @@ class RegisterPage extends StatelessWidget {
       },
       decoration: InputDecoration(
         labelText: 'Rôle',
-        prefixIcon: Icon(Icons.work, color: Color(0xFF8B0000)),
+        prefixIcon: Icon(Icons.work, color: primaryColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF8B0000)),
+          borderSide: BorderSide(color: primaryColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -331,13 +368,13 @@ class RegisterPage extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF8B0000), width: 2),
+          borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
         fillColor: Colors.white,
       ),
       dropdownColor: Colors.white,
-      icon: Icon(Icons.arrow_drop_down, color: Color(0xFF8B0000)),
+      icon: Icon(Icons.arrow_drop_down, color: primaryColor),
     ));
   }
 }

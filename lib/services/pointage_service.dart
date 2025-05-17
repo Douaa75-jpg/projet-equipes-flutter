@@ -63,28 +63,29 @@ class PointageService extends GetxService {
     }
   }
 
-  Future<List<dynamic>> getHistorique(String employeId, String date) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/historique/$employeId?date=$date'),
-        headers: _headers,
-      );
+Future<List<dynamic>> getHistorique(String employeId, String date) async {
+  try {
+    final uri = Uri.parse('$baseUrl/historique/$employeId?date=$date');
+    
+    debugPrint('URI: ${uri.toString()}'); // Log l'URL appelée
+    
+    final response = await http.get(uri, headers: _headers);
 
-      debugPrint('Historique Response: ${response.statusCode} - ${response.body}');
+    debugPrint('Response: ${response.statusCode} - ${response.body}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data is List ? data : [];
-      } else if (response.statusCode == 404) {
-        return [];
-      } else {
-        throw _handleError(response);
-      }
-    } catch (e) {
-      debugPrint('Error in getHistorique: $e');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List<dynamic>.from(data); // Conversion explicite en List
+    } else if (response.statusCode == 404) {
       return [];
+    } else {
+      throw _handleError(response);
     }
+  } catch (e) {
+    debugPrint('Error in getHistorique: $e');
+    return [];
   }
+}
 
   Future<Map<String, dynamic>> getHeuresEquipe(String chefId) async {
     try {

@@ -275,7 +275,6 @@ class _RhLayoutState extends State<RhLayout> {
           _buildMobileNavItem(context, Icons.dashboard, 'dashboard'.tr, '/dashboard'),
           _buildMobileNavItem(context, Icons.people, 'employees'.tr, '/liste-employes'),
           _buildMobileNavItem(context, Icons.people_outline, 'team_leaders'.tr, '/liste-chefs'),
-          _buildMobileNavItem(context, Icons.notifications, 'all_requests'.tr, '/Notifications'),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings),

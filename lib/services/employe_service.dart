@@ -212,6 +212,10 @@ class Employe {
   final String email;
   final String matricule;
   final String datedenaissance;
+  final int heuresSupp; // Ajoutez ce champ
+  final int heuresTravail; // Ajoutez ce champ
+  final int soldeConges; // Ajoutez ce champ
+  final int nbAbsences; // Ajoutez ce champ
   final Responsable? responsable;
 
   Employe({
@@ -221,6 +225,10 @@ class Employe {
     required this.email,
     required this.matricule,
     required this.datedenaissance,
+    required this.heuresSupp,
+    required this.heuresTravail,
+    required this.soldeConges,
+    required this.nbAbsences,
     this.responsable,
   });
 
@@ -232,6 +240,10 @@ class Employe {
       email: json['utilisateur']['email'] ?? '',
       matricule: json['utilisateur']['matricule'] ?? '',
       datedenaissance: json['utilisateur']['datedenaissance']?.toString() ?? '',
+      heuresSupp: json['heuresSupp'] ?? 0,
+      heuresTravail: json['heuresTravail'] ?? 0,
+      soldeConges: json['soldeConges'] ?? 0,
+      nbAbsences: json['nbAbsences'] ?? 0,
       responsable: json['responsable'] != null
           ? Responsable.fromJson(json['responsable'])
           : null,
@@ -246,6 +258,10 @@ class Employe {
       email: json['email'] ?? '',
       matricule: json['matricule'] ?? '',
       datedenaissance: json['datedenaissance']?.toString() ?? '',
+       heuresSupp: 0,
+      heuresTravail: 0,
+      soldeConges: 0,
+      nbAbsences: 0,
       responsable: null,
     );
   }

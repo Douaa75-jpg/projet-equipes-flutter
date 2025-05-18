@@ -181,6 +181,7 @@ String formatDate(String dateString) {
                 4: pw.FlexColumnWidth(3),
                 5: pw.FlexColumnWidth(2),
                 6: pw.FlexColumnWidth(2),
+                7: pw.FlexColumnWidth(2),
               },
               children: [
                 pw.TableRow(
@@ -192,6 +193,7 @@ String formatDate(String dateString) {
                       'Email',
                       'Matricule',
                       'Responsable',
+                      'Heures Supp',
                       'Solde congés',
                       'Absences'
                     ])
@@ -345,7 +347,7 @@ String formatDate(String dateString) {
                   ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
                   : 'Aucun responsable'
               ),
-              
+               buildPdfDetailRow('Heures supplémentaires', '${employee.heuresSupp} heures'),
               buildPdfDetailRow('Solde congés', '$solde jours'),
               buildPdfDetailRow('Nombre d\'absences', '${absencesCount[employee.id] ?? 0} jours'),
               pw.SizedBox(height: 30),
@@ -542,6 +544,7 @@ class ListeEmployeScreen extends StatelessWidget {
             DataColumn(label: Text('Email')),
             DataColumn(label: Text('Matricule')),
             DataColumn(label: Text('Responsable')),
+            DataColumn(label: Text('Heures Supp')),
             DataColumn(label: Text('Solde congés')),
             DataColumn(label: Text('Absences')),
             DataColumn(label: Text('Actions')),
@@ -560,7 +563,8 @@ class ListeEmployeScreen extends StatelessWidget {
                       : 'Aucun responsable',
                   ),
                 ),
-                
+
+                DataCell(_buildHeuresSupp(employee)),
                 DataCell(_buildSoldeConges(employee)),
                 DataCell(_buildAbsencesCount(employee)),
                 DataCell(_buildActionButtons(employee)),
@@ -572,6 +576,15 @@ class ListeEmployeScreen extends StatelessWidget {
     ));
   }
 
+Widget _buildHeuresSupp(Employe employee) {
+  return Text(
+    '${employee.heuresSupp} h',
+    style: TextStyle(
+      color: employee.heuresSupp > 0 ? Colors.green : Colors.grey,
+      fontWeight: FontWeight.bold,
+    ),
+  );
+}
 
 Widget _buildAbsencesCount(Employe employee) {
   return Obx(() {
@@ -666,6 +679,13 @@ Widget _buildAbsencesCount(Employe employee) {
                     ? '${employee.responsable!.prenom} ${employee.responsable!.nom}'
                     : 'Aucun responsable'
                 ),
+
+                _buildDetailRow(
+                'Heures supplémentaires', 
+                '${employee.heuresSupp} heures',
+                isImportant: true,
+                color: employee.heuresSupp > 0 ? Colors.green : Colors.grey,
+              ),
                // إضافة سطر لعرض عدد الغيابات
                 _buildDetailRow(
                   'Nombre d\'absences', 

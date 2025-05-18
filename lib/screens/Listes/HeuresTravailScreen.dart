@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import '../../../services/pointage_service.dart';
+import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import '../../services/pointage_service.dart';
 
 class HeuresTravailScreen extends StatefulWidget {
   final String employeId;
@@ -16,181 +17,177 @@ class HeuresTravailScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<HeuresTravailScreen> createState() => _HeuresTravailScreenState();
+  _HeuresTravailScreenState createState() => _HeuresTravailScreenState();
 }
 
 class _HeuresTravailScreenState extends State<HeuresTravailScreen> {
-  final PointageService _pointageService = Get.find();
-  final RxString selectedDate = ''.obs; // Vide par défaut pour afficher tous les pointages
-  final RxList<dynamic> allPointages = <dynamic>[].obs;
-  final RxBool isLoading = true.obs;
+  final PointageService _pointageService = PointageService();
+  final DateRangePickerController _dateController = DateRangePickerController();
+  
+  DateTime? _selectedDate;
+  bool _isLoading = false;
+  List<dynamic> _historique = [];
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    debugPrint('Chargement des pointages pour employé: ${widget.employeId}');
-    _loadAllPointages();
+    _loadHistorique();
   }
 
-void _loadAllPointages() async {
-  try {
-    isLoading.value = true;
-    final pointages = await _pointageService.getHistorique(widget.employeId, '');
-    
-    debugPrint('Pointages reçus: ${pointages.toString()}'); // Ajoutez ce log
-    
-    allPointages.assignAll(pointages);
-  } catch (e) {
-    debugPrint('Erreur détaillée: ${e.toString()}'); // Log plus détaillé
-    Get.snackbar('Erreur', 'Impossible de charger les pointages: ${e.toString()}');
-  } finally {
-    isLoading.value = false;
-  }
-}
+  Future<void> _loadHistorique() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-  List<dynamic> get filteredPointages {
-    if (selectedDate.value.isEmpty) return allPointages;
-    return allPointages.where((pointage) {
-      return pointage['date'] == selectedDate.value;
-    }).toList();
+    try {
+      String? dateStr;
+      if (_selectedDate != null) {
+        dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      }
+
+      final result = await _pointageService.getHistorique(
+        widget.employeId, 
+        dateStr ?? DateFormat('yyyy-MM-dd').format(DateTime.now())
+      );
+
+      setState(() {
+        _historique = result;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur de chargement: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onDateChanged(DateRangePickerSelectionChangedArgs args) {
+    if (args.value is DateTime) {
+      setState(() {
+        _selectedDate = args.value as DateTime;
+      });
+    }
+  }
+
+  void _applyDateFilter() {
+    _loadHistorique();
+  }
+
+  void _resetDateFilter() {
+    _dateController.selectedDate = null;
+    setState(() {
+      _selectedDate = null;
+    });
+    _loadHistorique();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Historique pointage - ${widget.employePrenom} ${widget.employeNom}'),
+        title: Text('Historique de pointage - ${widget.employePrenom} ${widget.employeNom}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
-            onPressed: () => _selectDate(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_alt_off),
-            onPressed: () {
-              selectedDate.value = '';
-            },
+            onPressed: () => _showDatePickerDialog(),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildDateSelector(),
-            const SizedBox(height: 20),
-            Expanded(
-              child: _buildHistoriqueTable(),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadAllPointages,
-        child: const Icon(Icons.refresh),
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+              ? Center(child: Text(_errorMessage))
+              : _historique.isEmpty
+                  ? const Center(child: Text('Aucun pointage trouvé'))
+                  : _buildHistoriqueList(),
     );
   }
 
-  Widget _buildDateSelector() {
-    return Obx(() => Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              selectedDate.value.isEmpty 
-                ? 'Tous les pointages' 
-                : 'Pointages du: ${selectedDate.value}',
-              style: const TextStyle(fontSize: 16),
-            ),
-            if (selectedDate.value.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => selectedDate.value = DateFormat('yyyy-MM-dd').format(DateTime.now()),
-              ),
-          ],
-        ),
-      ),
-    ));
-  }
-
-  Widget _buildHistoriqueTable() {
-    return Obx(() {
-      if (isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      if (allPointages.isEmpty) {
-        return const Center(child: Text('Aucun pointage trouvé pour cet employé'));
-      }
-
-      final pointages = filteredPointages;
-
-      if (pointages.isEmpty) {
-        return Center(child: Text(
-          selectedDate.value.isEmpty
-            ? 'Aucun pointage trouvé'
-            : 'Aucun pointage trouvé pour cette date',
-        ));
-      }
+ Widget _buildHistoriqueList() {
+  return ListView.builder(
+    itemCount: _historique.length,
+    itemBuilder: (context, index) {
+      final pointage = _historique[index];
+      final heure = pointage['heure'] is String 
+          ? DateFormat('HH:mm:ss').parse(pointage['heure'])
+          : DateTime.now();
+      final date = pointage['date'] is String 
+          ? DateFormat('yyyy-MM-dd').parse(pointage['date'])
+          : DateTime.now();
 
       return Card(
-        elevation: 4,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            columnSpacing: 20,
-            dataRowHeight: 50,
-            columns: const [
-              DataColumn(label: Text('Heure', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: Icon(
+            pointage['type'] == 'ENTREE' ? Icons.login : Icons.logout,
+            color: pointage['type'] == 'ENTREE' ? Colors.green : Colors.red,
+          ),
+          title: Text(
+            '${pointage['typeLibelle'] ?? (pointage['type'] == 'ENTREE' ? 'Entrée' : 'Sortie')} - ${DateFormat('HH:mm').format(heure)}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Date: ${DateFormat('dd/MM/yyyy').format(date)}'),
+              if (pointage['employe'] != null)
+                Text('Matricule: ${pointage['employe']['matricule']}'),
             ],
-            rows: pointages.map((pointage) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(pointage['heure'] ?? '--')),
-                  DataCell(
-                    Chip(
-                      label: Text(
-                        pointage['typeLibelle'] ?? '--',
-                        style: const TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                      backgroundColor: pointage['type'] == 'ENTREE' 
-                        ? Colors.green 
-                        : Colors.red,
-                    ),
-                  ),
-                  DataCell(Text(pointage['date'] ?? '--')),
-                ],
-              );
-            }).toList(),
+          ),
+          trailing: Text(
+            pointage['type'] == 'ENTREE' ? 'Entrée' : 'Sortie',
+            style: TextStyle(
+              color: pointage['type'] == 'ENTREE' ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       );
-    });
-  }
+    },
+  );
+}
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate.value.isEmpty 
-        ? DateTime.now() 
-        : DateFormat('yyyy-MM-dd').parse(selectedDate.value),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
+  void _showDatePickerDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Choisir une date'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SfDateRangePicker(
+                controller: _dateController,
+                selectionMode: DateRangePickerSelectionMode.single,
+                onSelectionChanged: _onDateChanged,
+                initialSelectedDate: _selectedDate,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: _resetDateFilter,
+                    child: const Text('Réinitialiser'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _applyDateFilter();
+                      Get.back();
+                    },
+                    child: const Text('Valider'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    
-    if (picked != null) {
-      selectedDate.value = DateFormat('yyyy-MM-dd').format(picked);
-    }
   }
 }

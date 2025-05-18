@@ -117,14 +117,6 @@ class _EmployeeLayoutState extends State<EmployeeLayout> {
   Widget _buildNotificationIcon({bool isMobile = false}) {
     return Obx(() => Stack(
       children: [
-        IconButton(
-          icon: Icon(
-            Icons.notifications,
-            size: isMobile ? 22 : 24,
-          ),
-          onPressed: _showNotificationsDialog,
-          tooltip: 'notifications'.tr,
-        ),
         if (notificationService.unreadCount.value > 0)
           Positioned(
             right: isMobile ? 6 : 8,

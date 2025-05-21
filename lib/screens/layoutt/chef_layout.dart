@@ -44,8 +44,8 @@ class _ChefLayoutState extends State<ChefLayout> {
                 children: [
                   Image.asset(
                     'assets/logo.png',
-                    height: 60,
-                    width: 60,
+                    height: 90,
+                    width: 90,
                     fit: BoxFit.contain,
                   ),
                   const Spacer(),
@@ -56,8 +56,8 @@ class _ChefLayoutState extends State<ChefLayout> {
                 children: [
                   Image.asset(
                     'assets/logo.png',
-                    height: 125,
-                    width: 125,
+                    height: 160,
+                    width: 160,
                     fit: BoxFit.contain,
                   ),
                   const Spacer(),
@@ -133,8 +133,8 @@ class _ChefLayoutState extends State<ChefLayout> {
               children: [
                 Image.asset(
                   'assets/logo.png',
-                  height: 60,
-                  width: 60,
+                  height: 90,
+                  width: 90,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 10),

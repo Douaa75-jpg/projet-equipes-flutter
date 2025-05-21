@@ -114,37 +114,6 @@ class _EmployeeLayoutState extends State<EmployeeLayout> {
     });
   }
 
-  Widget _buildNotificationIcon({bool isMobile = false}) {
-    return Obx(() => Stack(
-      children: [
-        if (notificationService.unreadCount.value > 0)
-          Positioned(
-            right: isMobile ? 6 : 8,
-            top: isMobile ? 6 : 8,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Text(
-                '${notificationService.unreadCount.value}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isMobile ? 8 : 10,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    ));
-  }
-
   void _showNotificationsDialog() {
     Get.dialog(
       AlertDialog(
@@ -272,8 +241,8 @@ class _EmployeeLayoutState extends State<EmployeeLayout> {
               children: [
                 Image.asset(
                   'assets/logo.png',
-                  height: 60,
-                  width: 60,
+                  height: 90,
+                  width: 90,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 10),
@@ -600,8 +569,8 @@ class _EmployeeLayoutState extends State<EmployeeLayout> {
               children: [
                 Image.asset(
                   'assets/logo.png',
-                  height: isMobile ? 40 : (isTablet ? 50 : 60),
-                  width: isMobile ? 40 : (isTablet ? 50 : 60),
+                  height: isMobile ? 70 : (isTablet ? 90 : 100),
+                  width: isMobile ? 70 : (isTablet ? 90 : 100),
                   fit: BoxFit.contain,
                 ),
                 if (!isMobile) const Spacer(),
@@ -619,19 +588,6 @@ class _EmployeeLayoutState extends State<EmployeeLayout> {
             elevation: 1,
             iconTheme: const IconThemeData(color: Colors.black),
             toolbarHeight: isMobile ? 60 : (isTablet ? 70 : 80),
-            actions: [
-              if (isMobile) ...[
-                _buildNotificationIcon(isMobile: true),
-                IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {},
-                  tooltip: 'search'.tr,
-                ),
-              ] else ...[
-                _buildNotificationIcon(isMobile: false),
-                _buildMoreMenu(context),
-              ],
-            ],
           ),
           body: Column(
             children: [

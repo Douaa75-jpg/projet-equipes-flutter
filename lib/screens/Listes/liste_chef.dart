@@ -197,42 +197,6 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
     );
   }
 
-  void _showAddResponsableDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Ajouter un Responsable'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(decoration: InputDecoration(labelText: 'Nom')),
-              TextField(decoration: InputDecoration(labelText: 'Prénom')),
-              TextField(decoration: InputDecoration(labelText: 'Email')),
-              TextField(decoration: InputDecoration(labelText: 'Matricule')),
-              TextField(
-                  decoration: InputDecoration(labelText: 'Date de naissance')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Responsable ajouté avec succès')),
-              );
-              _fetchResponsables();
-            },
-            child: Text('Ajouter'),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showEmployeeDetails(BuildContext context, Responsable responsable) {
     showDialog(
@@ -295,120 +259,150 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
       title: 'Liste des Chefs d\'Équipe',
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Rechercher un chef d\'équipe',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear),
-                              onPressed: () {
-                                _filterResponsables('');
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: _filterResponsables,
-                  ),
-                ),
-                SizedBox(width: 10),
-                IconButton(
-                  icon: Icon(Icons.picture_as_pdf, color: Colors.white),
-                  onPressed: _exportToPdf,
-                  tooltip: 'Exporter en PDF',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.red,
-                  ),
-                ),
-                SizedBox(width: 10),
-                FloatingActionButton(
-                  onPressed: _showAddResponsableDialog,
-                  child: Icon(Icons.add),
-                  tooltip: 'Ajouter Responsable',
-                  mini: true,
-                ),
-              ],
-            ),
-          ),
+          _buildSearchBar(),
           Expanded(
             child: _isLoading
                 ? Center(child: CircularProgressIndicator())
                 : _filteredResponsables.isEmpty
-                    ? Center(
-                        child: Text(_searchQuery.isEmpty
-                            ? 'Aucun chef d\'équipe disponible'
-                            : 'Aucun résultat trouvé'))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: DataTable(
-                          columns: [
-                            DataColumn(label: Text('Nom')),
-                            DataColumn(label: Text('Prénom')),
-                            DataColumn(label: Text('Email')),
-                            DataColumn(label: Text('Matricule')),
-                            DataColumn(label: Text('Date de naissance')),
-                            DataColumn(label: Text('Actions')),
-                          ],
-                          rows: _filteredResponsables.map((responsable) {
-                            return DataRow(cells: [
-                              DataCell(Text(responsable.nom)),
-                              DataCell(Text(responsable.prenom)),
-                              DataCell(Text(responsable.email)),
-                              DataCell(Text(responsable.matricule ?? 'N/A')),
-                              DataCell(Text(responsable.datedenaissance != null
-                                  ? DateFormat('dd/MM/yyyy').format(
-                                      DateTime.parse(
-                                          responsable.datedenaissance!))
-                                  : 'N/A')),
-                              DataCell(Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.group),
-                                    onPressed: () => _showEmployeeDetails(
-                                        context, responsable),
-                                    tooltip: 'Voir les employés',
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.picture_as_pdf,
-                                        color: Colors.green),
-                                    onPressed: () =>
-                                        _exportTeamPdf(responsable),
-                                    tooltip: 'Exporter l\'équipe en PDF',
-                                  ),
-                                  IconButton(
-                                    icon:
-                                        Icon(Icons.search, color: Colors.blue),
-                                    onPressed: () => _showDetails(responsable),
-                                    tooltip: 'Détails',
-                                  ),
-                                  IconButton(
-                                    icon:
-                                        Icon(Icons.edit, color: Colors.orange),
-                                    onPressed: () =>
-                                        _editResponsable(responsable),
-                                    tooltip: 'Modifier',
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () =>
-                                        _deleteResponsable(responsable),
-                                    tooltip: 'Supprimer',
-                                  ),
-                                ],
-                              )),
-                            ]);
-                          }).toList(),
-                        ),
-                      ),
+                    ? _buildEmptyState()
+                    : _buildResponsableTable(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Rechercher un chef d\'équipe',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear),
+                            onPressed: () => _filterResponsables(''),
+                          )
+                        : null,
+                  ),
+                  onChanged: _filterResponsables,
+                ),
+              ),
+              SizedBox(width: 10),
+              IconButton(
+                icon: Icon(Icons.picture_as_pdf, color: Colors.red),
+                onPressed: _exportToPdf,
+                tooltip: 'Exporter en PDF',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Card(
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Text(
+            _searchQuery.isEmpty
+                ? 'Aucun chef d\'équipe disponible'
+                : 'Aucun résultat trouvé',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 18,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResponsableTable() {
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('Nom')),
+            DataColumn(label: Text('Prénom')),
+            DataColumn(label: Text('Email')),
+            DataColumn(label: Text('Matricule')),
+            DataColumn(label: Text('Date naissance')),
+            DataColumn(label: Text('Actions')),
+          ],
+          rows: _filteredResponsables.map((responsable) {
+            return DataRow(
+              cells: [
+                DataCell(Text(responsable.nom)),
+                DataCell(Text(responsable.prenom)),
+                DataCell(Text(responsable.email)),
+                DataCell(Text(responsable.matricule ?? 'N/A')),
+                DataCell(Text(responsable.datedenaissance != null
+                    ? DateFormat('dd/MM/yyyy')
+                        .format(DateTime.parse(responsable.datedenaissance!))
+                    : 'N/A')),
+                DataCell(_buildActionButtons(responsable)),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(Responsable responsable) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Icon(Icons.group, color: Colors.blueGrey),
+          onPressed: () => _showEmployeeDetails(context, responsable),
+          tooltip: 'Voir les employés',
+        ),
+        IconButton(
+          icon: Icon(Icons.picture_as_pdf, color: Colors.green),
+          onPressed: () => _exportTeamPdf(responsable),
+          tooltip: 'Exporter l\'équipe en PDF',
+        ),
+        IconButton(
+          icon: Icon(Icons.info_outline, color: Colors.blue),
+          onPressed: () => _showDetails(responsable),
+          tooltip: 'Détails',
+        ),
+        IconButton(
+          icon: Icon(Icons.edit, color: Colors.orange),
+          onPressed: () => _editResponsable(responsable),
+          tooltip: 'Modifier',
+        ),
+        IconButton(
+          icon: Icon(Icons.delete_outline, color: Colors.red),
+          onPressed: () => _deleteResponsable(responsable),
+          tooltip: 'Supprimer',
+        ),
+      ],
     );
   }
 
@@ -421,12 +415,16 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Nom: ${responsable.nom}'),
-              Text('Prénom: ${responsable.prenom}'),
-              Text('Email: ${responsable.email}'),
-              Text('Matricule: ${responsable.matricule ?? 'N/A'}'),
-              Text(
-                  'Date de naissance: ${responsable.datedenaissance != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(responsable.datedenaissance!)) : 'N/A'}'),
+              _buildDetailRow('Nom', responsable.nom),
+              _buildDetailRow('Prénom', responsable.prenom),
+              _buildDetailRow('Email', responsable.email),
+              _buildDetailRow('Matricule', responsable.matricule ?? 'N/A'),
+              _buildDetailRow(
+                'Date de naissance', 
+                responsable.datedenaissance != null 
+                  ? DateFormat('dd/MM/yyyy').format(DateTime.parse(responsable.datedenaissance!))
+                  : 'N/A'
+              ),
             ],
           ),
         ),
@@ -435,6 +433,24 @@ class _ListeChefScreenState extends State<ListeChefScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text('Fermer'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Text(value),
         ],
       ),
     );

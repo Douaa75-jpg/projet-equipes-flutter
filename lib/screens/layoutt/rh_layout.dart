@@ -114,44 +114,7 @@ class _RhLayoutState extends State<RhLayout> {
     });
   }
 
-  Widget _buildNotificationIcon({bool isMobile = false}) {
-    return Obx(() => Stack(
-      children: [
-        IconButton(
-          icon: Icon(
-            Icons.notifications,
-            size: isMobile ? 22 : 24,
-          ),
-          onPressed: _showNotificationsDialog,
-          tooltip: 'notifications'.tr,
-        ),
-        if (notificationService.unreadCount.value > 0)
-          Positioned(
-            right: isMobile ? 6 : 8,
-            top: isMobile ? 6 : 8,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Text(
-                '${notificationService.unreadCount.value}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isMobile ? 8 : 10,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    ));
-  }
+ 
 
   void _showNotificationsDialog() {
     Get.dialog(
@@ -543,19 +506,6 @@ class _RhLayoutState extends State<RhLayout> {
             elevation: 1,
             iconTheme: const IconThemeData(color: Colors.black),
             toolbarHeight: isMobile ? 60 : (isTablet ? 70 : 80),
-            actions: [
-              if (isMobile) ...[
-                _buildNotificationIcon(isMobile: true),
-                IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {},
-                  tooltip: 'search'.tr,
-                ),
-              ] else ...[
-                _buildNotificationIcon(isMobile: false),
-                _buildMoreMenu(context),
-              ],
-            ],
           ),
           body: Column(
             children: [

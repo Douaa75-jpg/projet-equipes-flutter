@@ -125,19 +125,13 @@ class DemandeController extends GetxController {
   // Simuler l'approbation d'une demande
   Future<void> simulateApproval(String demandeId) async {
     await Future.delayed(Duration(seconds: 2));
-    notificationService.addEmployeeNotification(
-      'Votre demande de ${typeDemande.value} a été approuvée',
-      demandeId: demandeId,
-    );
+   
   }
 
   // Simuler le rejet d'une demande
   Future<void> simulateRejection(String demandeId) async {
     await Future.delayed(Duration(seconds: 2));
-    notificationService.addEmployeeNotification(
-      'Votre demande de ${typeDemande.value} a été rejetée',
-      demandeId: demandeId,
-    );
+   
   }
 
   Future<void> submitForm() async {

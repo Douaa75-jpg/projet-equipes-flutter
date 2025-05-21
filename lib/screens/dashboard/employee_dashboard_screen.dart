@@ -24,6 +24,7 @@ class EmployeeDashboardController extends GetxController {
   final RxMap<String, dynamic> weeklyChartData = <String, dynamic>{}.obs;
   final RxMap<String, dynamic> attendanceDistribution = <String, dynamic>{}.obs;
   final RxInt absences = 0.obs;
+  final RxDouble heuresSupplementaires = 0.0.obs;
   final RxMap<DateTime, String> holidays = <DateTime, String>{}.obs;
   final Color primaryColor = const Color(0xFF8B0000);
   final Color secondaryColor = const Color(0xFFDAA520);
@@ -88,7 +89,7 @@ class EmployeeDashboardController extends GetxController {
     }
   }
 
- Future<void> loadDashboardData() async {
+Future<void> loadDashboardData() async {
   isLoading.value = true;
   chartsLoading.value = true;
 
@@ -97,13 +98,11 @@ class EmployeeDashboardController extends GetxController {
     if (!authProvider.isAuthenticated.value) return;
 
     final employeId = authProvider.userId.value;
-
-     final now = DateTime.now();
+    final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final dateStrr = DateFormat('yyyy-MM-dd').format(monday);
     
-    // حساب وتحديث الغيابات أولاً
-    await calculateAndUpdateAbsences(); // Changé de controller.calculateAndUpdateAbsences() à calculateAndUpdateAbsences()
+    await calculateAndUpdateAbsences();
     
     final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate.value);
     final date7Jours = DateFormat('yyyy-MM-dd')
@@ -115,6 +114,17 @@ class EmployeeDashboardController extends GetxController {
       _demandeService.getSoldeConges(employeId),
       _pointageService.getWeeklyHoursChartData(employeId, dateStrr),
       _pointageService.getAttendanceDistribution(employeId, date7Jours, dateStr),
+      _pointageService.getHeuresSupplementairesEmploye(employeId).catchError((e) {
+        debugPrint('Error getting heures supplementaires: $e');
+        return {
+          'heuresSupplementaires': 0.0,
+          'employe': 'Inconnu',
+          'periode': {
+            'debut': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+            'fin': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          }
+        };
+      }),
     ]);
 
     heuresTravail.value = results[0] as Map<String, dynamic>? ?? {};
@@ -123,8 +133,12 @@ class EmployeeDashboardController extends GetxController {
     weeklyChartData.value = results[3] as Map<String, dynamic>? ?? {};
     attendanceDistribution.value = results[4] as Map<String, dynamic>? ?? {};
     
+    // Gestion plus robuste des heures supplémentaires
+    final heuresSupResult = results[5] as Map<String, dynamic>;
+    heuresSupplementaires.value = heuresSupResult['heuresSupplementaires']?.toDouble() ?? 0.0;
+    
   } catch (e) {
-    showSnackBar('Erreur lors du chargement des données: $e', Colors.red);
+    showSnackBar('Erreur lors du chargement des données: ${e.toString().replaceAll('Exception: ', '')}', Colors.red);
   } finally {
     isLoading.value = false;
     chartsLoading.value = false;
@@ -227,51 +241,63 @@ class EmployeeDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildMobileStatsGrid() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: 120), // Hauteur minimale
-                child: _buildStatCard(
-                  title: 'Heures travaillées',
-                  value: controller.heuresTravail['totalHeuresFormatted'] ??
-                      '0h 0min',
-                  icon: Icons.access_time,
-                  color: controller.primaryColor,
-                  subtitle: 'Aujourd\'hui',
-                  isMobile: true,
-                ),
-              ),
-            ),
-            SizedBox(width: 6),
-            Expanded(
+  return Column(
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: 120),
               child: _buildStatCard(
-                title: 'Absences',
-                value: '${controller.nbAbsences.value} jours',
-                icon: Icons.warning_amber_rounded,
-                color: controller.nbAbsences.value > 3 ? Colors.red : Colors.orange,
-                subtitle: 'Total absences', 
+                title: 'Heures travaillées',
+                value: controller.heuresTravail['totalHeuresFormatted'] ?? '0h 0min',
+                icon: Icons.access_time,
+                color: controller.primaryColor,
+                subtitle: 'Aujourd\'hui',
                 isMobile: true,
               ),
             ),
-          ],
-        ),
-        SizedBox(height: 6),
-        ConstrainedBox(
-          constraints: BoxConstraints(minHeight: 120), // Même hauteur
-          child: _buildStatCard(
-            title: 'Solde de congés',
-            value: '${controller.soldeConges.value} jours',
-            icon: Icons.beach_access,
-            color: Colors.blue.shade600,
-            isMobile: true,
           ),
-        ),
-      ],
-    );
-  }
+          SizedBox(width: 6),
+          Expanded(
+            child: _buildStatCard(
+              title: 'Absences',
+              value: '${controller.nbAbsences.value} jours',
+              icon: Icons.warning_amber_rounded,
+              color: controller.nbAbsences.value > 3 ? Colors.red : Colors.orange,
+              subtitle: 'Total absences', 
+              isMobile: true,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 6),
+      Row(
+        children: [
+          Expanded(
+            child: _buildStatCard(
+              title: 'Solde de congés',
+              value: '${controller.soldeConges.value} jours',
+              icon: Icons.beach_access,
+              color: Colors.blue.shade600,
+              isMobile: true,
+            ),
+          ),
+          SizedBox(width: 6),
+          Expanded(
+            child: _buildStatCard(
+              title: 'Heures supplémentaires',
+              value: '${controller.heuresSupplementaires.value.toStringAsFixed(2)} h',
+              icon: Icons.timer,
+              color: Colors.purple.shade600,
+              isMobile: true,
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
   Widget _buildDesktopStatsGrid(bool isTablet) {
     return Row(
@@ -287,16 +313,15 @@ class EmployeeDashboardScreen extends StatelessWidget {
             isMobile: false,
           ),
         ),
-        SizedBox(width: isTablet ? 8 : 12),
+       SizedBox(width: isTablet ? 8 : 12),
         Expanded(
           child: _buildStatCard(
             title: 'Absences',
-            value:
-                '${controller.nbAbsences.value} jours', // استخدم nbAbsences هنا
+            value: '${controller.nbAbsences.value} jours',
             icon: Icons.warning_amber_rounded,
-            color: controller.nbAbsences.value > 3 ? Colors.red : Colors.orange,
-            subtitle: '30 derniers jours',
-            isMobile: true,
+            color: Colors.blue.shade600,
+            subtitle: 'Aujourd\'hui',
+            isMobile: false,
           ),
         ),
         SizedBox(width: isTablet ? 8 : 12),
@@ -305,10 +330,21 @@ class EmployeeDashboardScreen extends StatelessWidget {
             title: 'Solde de congés',
             value: '${controller.soldeConges.value} jours',
             icon: Icons.beach_access,
-            color: Colors.blue.shade600,
-            subtitle: 'Aujourd\'hui',
+            color: controller.nbAbsences.value > 3 ? Colors.red : Colors.orange,
+            subtitle: '30 derniers jours',
             isMobile: false,
           ),
+        ),
+         SizedBox(width: isTablet ? 8 : 12),
+      Expanded(
+        child: _buildStatCard(
+          title: 'Heures supplémentaires',
+          value: '${controller.heuresSupplementaires.value.toStringAsFixed(2)} h',
+          icon: Icons.timer,
+          color: Colors.purple.shade600,
+          subtitle: 'Ce mois-ci',
+          isMobile: false,
+        ),
         ),
       ],
     );

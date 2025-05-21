@@ -341,4 +341,32 @@ Future<List<dynamic>> getHistorique(String employeId, String date) async {
       };
     }
   }
+
+
+  Future<Map<String, dynamic>> getHeuresSupplementairesEmploye(String employeId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/employe/$employeId'), // Modifié ici
+      headers: _headers,
+    );
+
+    debugPrint('Heures Supplémentaires Response: ${response.statusCode} - ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw _handleError(response);
+    }
+  } catch (e) {
+    debugPrint('Error in getHeuresSupplementairesEmploye: $e');
+    return {
+      'employe': 'Inconnu',
+      'heuresSupplementaires': 0,
+      'periode': {
+        'debut': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'fin': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      }
+    };
+  }
+}
 }

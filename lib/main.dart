@@ -13,7 +13,6 @@ import 'screens/dashboard/employee_dashboard_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/acceuil/accueil_chef_.dart';
 import 'screens/acceuil/Accueil_RH.dart';
-import 'screens/dashboard/admin_dashboard_screen.dart';
 import 'DeconnexionScreen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
@@ -27,6 +26,8 @@ import 'locales/translation_service.dart'; // Import du service de traduction
 import './services/Employe_Service.dart';
 import './screens/choice_screen.dart';
 import './services/chef_equipe_service.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,7 +85,8 @@ void main() async {
 
 Future<void> initializeServices() async {
   try {
-    // Enregistrement des services avec GetX
+    tz.initializeTimeZones();
+
     Get.put(AuthService());
     Get.put(PointageService());
     Get.put(RhService());
@@ -92,12 +94,13 @@ Future<void> initializeServices() async {
     Get.put(EmployeService());
     Get.put(ChefEquipeService());
 
-    // NotificationService avec persistance locale
-    Get.put(NotificationService());
+    // Initialiser NotificationService
+    final notificationService = NotificationService();
+    await notificationService.initNotifications();
+    Get.put(notificationService, permanent: true);
 
     Get.put(AuthProvider());
 
-    // Configuration initiale du thème
     final themeNotifier = Get.put(ThemeNotifier());
     await themeNotifier.initialize();
   } catch (e) {
@@ -139,17 +142,14 @@ class MyApp extends StatelessWidget {
             name: '/employee_dashboard', page: () => EmployeeDashboardScreen()),
         GetPage(name: '/deconnexion', page: () => const DeconnexionScreen()),
         GetPage(name: '/register', page: () => RegisterPage()),
+        GetPage(name: '/forgot-password', page: () => ForgotPasswordScreen()),
         GetPage(
-          name: '/forgot-password', 
-          page: () => ForgotPasswordScreen()
-        ),
-         GetPage(
           name: '/reset-password',
           page: () {
             final args = Get.parameters;
             final token = args['token'];
-            return token != null 
-                ? ResetPasswordScreen(token: token) 
+            return token != null
+                ? ResetPasswordScreen(token: token)
                 : LoginScreen();
           },
         ),
@@ -157,7 +157,8 @@ class MyApp extends StatelessWidget {
           name: '/demandes',
           page: () => GestionDemandeScreen(),
           binding: BindingsBuilder(() {
-            Get.lazyPut<GestionDemandeController>(() => GestionDemandeController());
+            Get.lazyPut<GestionDemandeController>(
+                () => GestionDemandeController());
           }),
         ),
       ],
@@ -278,7 +279,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final typeResponsable = authService.typeResponsable.value.isNotEmpty
           ? authProvider.typeResponsable.value
           : authProvider.typeResponsable.value;
-
       switch (role) {
         case 'EMPLOYE':
           return const AccueilEmploye();
@@ -291,8 +291,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
           } else {
             return LoginScreen();
           }
-        case 'ADMINISTRATEUR':
-          return AdminDashboardScreen();
         default:
           return LoginScreen();
       }

@@ -89,7 +89,6 @@ class _ChefLayoutState extends State<ChefLayout> {
                 children: [
                   _buildStatusItem(
                       Icons.update, 'Dernière MAJ: ${DateFormat('HH:mm').format(DateTime.now())}'),
-                  _buildStatusItem(Icons.cloud, 'Services: Online', isOnline: true),
                 ],
               ),
             ),
@@ -184,50 +183,95 @@ class _ChefLayoutState extends State<ChefLayout> {
   }
 
   Widget _buildUserInfo(String prenom, String nom, {bool isMobile = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
+  final displayName = (prenom.isEmpty && nom.isEmpty) 
+      ? 'Bienvenue' 
+      : '$prenom $nom'.trim();
+
+  return Container(
+    padding: EdgeInsets.symmetric(
+      vertical: isMobile ? 8 : 12,
+      horizontal: isMobile ? 12 : 16,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: Colors.grey.withOpacity(0.2),
+        width: 1,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Bienvenue, ',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w300,
-                ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Avatar Circle with status indicator
+        Container(
+          width: isMobile ? 32 : 40,
+          height: isMobile ? 32 : 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.blue[50],
+            border: Border.all(
+              color: Colors.blue,
+              width: 1.5,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.person,
+              size: isMobile ? 16 : 20,
+              color: Colors.blue[700],
+            ),
+          ),
+        ),
+
+        SizedBox(width: isMobile ? 8 : 12),
+
+        // User Info Column
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Bienvenue',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: isMobile ? 10 : 12,
+                fontWeight: FontWeight.normal,
               ),
-              Text(
-                '$prenom $nom',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: isMobile ? 14 : 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            Text(
+              displayName,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+
+        SizedBox(width: isMobile ? 4 : 8),
+
+        // Status Indicator
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withOpacity(0.3),
+                blurRadius: 4,
+                spreadRadius: 1,
               ),
             ],
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.person_outline, color: Colors.blue, size: 24),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   void _navigateToRoute(BuildContext context, String route) {
   setState(() {

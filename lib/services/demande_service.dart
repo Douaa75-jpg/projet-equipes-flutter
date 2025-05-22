@@ -130,25 +130,34 @@ class DemandeService extends GetxService {
   }
 
   Future<bool> updateDemande(String demandeId, Map<String, dynamic> updatedData) async {
-    final url = Uri.parse('$baseUrl/demande/$demandeId');
-    try {
-      final response = await http.patch(
-        url,
-        headers: await _getHeaders(),
-        body: json.encode(updatedData),
-      );
+  final url = Uri.parse('$baseUrl/demande/$demandeId');
+  try {
+    final headers = await _getHeaders();
+    // Extract userId from updatedData and send it separately
+    final userId = updatedData['userId'];
+    final data = Map<String, dynamic>.from(updatedData);
+    data.remove('userId');
+    
+    final response = await http.patch(
+      url,
+      headers: headers,
+      body: json.encode({
+        ...data,
+        'userId': userId,  // Send userId as a separate field
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        return responseData['success'] ?? false;
-      } else {
-        final error = json.decode(response.body);
-        throw Exception(error['message'] ?? 'Échec de la mise à jour');
-      }
-    } catch (e) {
-      throw Exception('Erreur: ${e.toString()}');
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      return responseData['success'] ?? false;
+    } else {
+      final error = json.decode(response.body);
+      throw Exception(error['message'] ?? 'Échec de la mise à jour');
     }
+  } catch (e) {
+    throw Exception('Erreur: ${e.toString()}');
   }
+}
 
   Future<void> approveDemande(
       String demandeId, 
@@ -262,17 +271,21 @@ Future<List<dynamic>> getUpcomingTeamLeaveRequests(String responsableId) async {
   Future<List<Map<String, dynamic>>> getJoursFeries(int year) async {
   try {
     final response = await http.get(
-      Uri.parse('$baseUrl/jours-feries?year=$year'),
+      Uri.parse('$baseUrl/demande/jours-feries?year=$year'),
       headers: await _getHeaders(),
     );
 
     if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(json.decode(response.body));
+      final data = json.decode(response.body);
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+      return []; // Return empty list if data format is unexpected
     }
-    throw Exception('Failed to load holidays');
+    return []; // Return empty list on error
   } catch (e) {
     debugPrint('Error getting holidays: $e');
-    return [];
+    return []; // Return empty list on exception
   }
 }
 }

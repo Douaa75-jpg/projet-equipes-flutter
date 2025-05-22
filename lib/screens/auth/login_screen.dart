@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:gestion_equipe_flutter/services/auth_service.dart';
 import 'package:gestion_equipe_flutter/screens/acceuil/accueil_chef_.dart';
-import 'package:gestion_equipe_flutter/screens/dashboard/admin_dashboard_screen.dart';
-import 'package:gestion_equipe_flutter/screens/auth/reset_password_screen.dart';
 import 'package:gestion_equipe_flutter/screens/auth/forgot_password_screen.dart';
 import 'package:gestion_equipe_flutter/screens/acceuil/accueil_employe.dart';
 import '../auth/registre_screen.dart';
@@ -70,9 +68,7 @@ class LoginController extends GetxController {
         Get.offAll(() => const AccueilEmploye());
       } else if (role == 'RESPONSABLE') {
         handleResponsableNavigation(subRole);
-      } else if (role == 'ADMINISTRATEUR') {
-        Get.offAll(() => AdminDashboardScreen());
-      } else {
+      }else {
         Get.snackbar(
           'Erreur',
           'Rôle non défini: $role',

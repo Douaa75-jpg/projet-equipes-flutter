@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../services/demande_service.dart';
 import '../../auth_controller.dart';
 import '../layoutt/rh_layout.dart';
+import '../../services/notification_service.dart';
 
 class GestionDemandeController extends GetxController {
   final DemandeService _demandeService = Get.find();
@@ -75,62 +76,84 @@ class GestionDemandeController extends GetxController {
     );
   }
 
-  Future<void> approveDemande(String demandeId, String type, String dateDebut, String? dateFin) async {
-    try {
-      if (type == 'CONGE') {
-        final days = calculateLeaveDays(dateDebut, dateFin);
-        await _demandeService.approveDemande(
-          demandeId, 
-          _authProvider.userId.value,
-          days: days,
-        );
-      } else {
-        await _demandeService.approveDemande(
-          demandeId, 
-          _authProvider.userId.value,
-        );
-      }
-      
-      Get.snackbar(
-        'Succès',
-        'Demande approuvée avec succès',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      loadDemandes();
-    } catch (e) {
-      Get.snackbar(
-        'Erreur',
-        'Erreur: ${e.toString()}',
-        backgroundColor: Colors.red,
-      );
-    }
-  }
-
-  Future<void> rejectDemande(String demandeId, String raison, String type) async {
-    try {
-      await _demandeService.rejectDemande(
+Future<void> approveDemande(String demandeId, String type, String dateDebut, String? dateFin) async {
+  try {
+    // Add null checks
+    final typeSafe = type ?? 'CONGE'; // Provide default if null
+    final dateDebutSafe = dateDebut ?? DateTime.now().toIso8601String(); // Provide default if null
+    
+    if (typeSafe == 'CONGE') {
+      final days = calculateLeaveDays(dateDebutSafe, dateFin);
+      await _demandeService.approveDemande(
         demandeId, 
         _authProvider.userId.value,
-        raison: raison,
-        type: type,
+        days: days,
       );
-      
-      Get.snackbar(
-        'Succès',
-        'Demande rejetée avec succès',
-        backgroundColor: Color(0xFF8B0000),
-        colorText: Colors.white,
-      );
-      loadDemandes();
-    } catch (e) {
-      Get.snackbar(
-        'Erreur',
-        'Erreur: ${e.toString()}',
-        backgroundColor: Colors.red,
+    } else {
+      await _demandeService.approveDemande(
+        demandeId, 
+        _authProvider.userId.value,
       );
     }
+    
+    // Envoyer notification à l'employé
+    final notificationService = Get.find<NotificationService>();
+    final demandeType = getTypeDemande(type);
+    
+    notificationService.addEmployeeNotification(
+      'Votre demande de $demandeType a été approuvée',
+      demandeId: demandeId,
+    );
+
+    Get.snackbar(
+      'Succès',
+      'Demande approuvée avec succès',
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+    loadDemandes();
+  } catch (e) {
+    Get.snackbar(
+      'Erreur',
+      'Erreur: ${e.toString()}',
+      backgroundColor: Colors.red,
+    );
   }
+}
+
+  Future<void> rejectDemande(String demandeId, String raison, String type) async {
+  try {
+    await _demandeService.rejectDemande(
+      demandeId, 
+      _authProvider.userId.value,
+      raison: raison,
+      type: type,
+    );
+    
+    // Envoyer notification à l'employé
+    final notificationService = Get.find<NotificationService>();
+    final demandeType = getTypeDemande(type);
+    
+    notificationService.addEmployeeNotification(
+      'Votre demande de $demandeType a été rejetée. Raison: $raison',
+      demandeId: demandeId,
+    );
+
+    Get.snackbar(
+      'Succès',
+      'Demande rejetée avec succès',
+      backgroundColor: Color(0xFF8B0000),
+      colorText: Colors.white,
+    );
+    loadDemandes();
+  } catch (e) {
+    Get.snackbar(
+      'Erreur',
+      'Erreur: ${e.toString()}',
+      backgroundColor: Colors.red,
+    );
+  }
+}
 
   int calculateLeaveDays(String dateDebut, String? dateFin) {
     final start = DateTime.parse(dateDebut);
@@ -175,8 +198,8 @@ Widget build(BuildContext context) {
     }
 
     return RhLayout(
-      title: 'Gestion des demandes',
       child: _buildContent(),
+      title: 'Gestion des demandes',
     );
   });
 }

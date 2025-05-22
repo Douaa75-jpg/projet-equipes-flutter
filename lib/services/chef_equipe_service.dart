@@ -43,6 +43,24 @@ class ChefEquipeService {
     }
   }
 
+
+  // Dans ChefEquipeService.dart
+Future<void> updateEmployee(String employeId, Map<String, dynamic> updateData) async {
+  try {
+    final response = await http.put(  // Changé de patch à put
+      Uri.parse('http://localhost:3000/utilisateurs/$employeId'),
+      headers: await _getHeaders(),  // Utilise les headers avec auth
+      body: json.encode(updateData),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Échec de la mise à jour: ${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('Erreur lors de la mise à jour: $e');
+  }
+}
+
 Future<Map<String, dynamic>> getEmployeInfo(String employeId) async {
   try {
     if (employeId.isEmpty) {

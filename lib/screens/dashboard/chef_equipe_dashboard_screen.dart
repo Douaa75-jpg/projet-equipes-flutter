@@ -34,7 +34,8 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
   Future<void> _loadPresenceStats() async {
     try {
       final chefId = authController.userId.value;
-      final stats = await chefEquipeService.getPresencesSousChefAujourdhui(chefId);
+      final stats =
+          await chefEquipeService.getPresencesSousChefAujourdhui(chefId);
       setState(() {
         presenceStats = stats;
         isLoadingPresence = false;
@@ -45,6 +46,95 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
         isLoadingPresence = false;
       });
     }
+  }
+
+  // Ajoutez cette méthode dans _ChefEquipeDashboardScreenState
+  Future<void> _showUpdateEmployeDialog(dynamic employe) async {
+    final nomController =
+        TextEditingController(text: employe['utilisateur']['nom']);
+    final prenomController =
+        TextEditingController(text: employe['utilisateur']['prenom']);
+    final matriculeController =
+        TextEditingController(text: employe['utilisateur']['matricule']);
+    final emailController =
+        TextEditingController(text: employe['utilisateur']['email']);
+
+    await Get.dialog(
+      AlertDialog(
+        title: const Text('Modifier employé'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nomController,
+                decoration: const InputDecoration(labelText: 'Nom'),
+              ),
+              TextField(
+                controller: prenomController,
+                decoration: const InputDecoration(labelText: 'Prénom'),
+              ),
+              TextField(
+                controller: matriculeController,
+                decoration: const InputDecoration(labelText: 'Matricule'),
+              ),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8B0000),
+            ),
+            onPressed: () async {
+              try {
+                final updatedData = {
+                  'nom': nomController.text,
+                  'prenom': prenomController.text,
+                  'matricule': matriculeController.text,
+                  'email': emailController.text,
+                };
+
+                // Appel au service pour mettre à jour l'employé
+                await chefEquipeService.updateEmployee(
+                  employe['id']?.toString() ??
+                      employe['utilisateur']['id']?.toString() ??
+                      '',
+                  updatedData,
+                );
+
+                Get.back();
+                _loadData(); // Rafraîchir les données
+                Get.snackbar(
+                  'Succès',
+                  'Employé mis à jour avec succès',
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                );
+              } catch (e) {
+                Get.snackbar(
+                  'Erreur',
+                  'Échec de la mise à jour: $e',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Enregistrer',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadData() async {
@@ -161,7 +251,8 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: color?.withOpacity(0.2) ?? Colors.grey.withOpacity(0.2),
+                    color:
+                        color?.withOpacity(0.2) ?? Colors.grey.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color ?? Colors.grey),
@@ -240,33 +331,47 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
                   dataRowMinHeight: 56,
                   dataRowMaxHeight: 56,
                   headingRowColor: WidgetStateProperty.resolveWith<Color?>(
-                    (Set<WidgetState> states) => const Color(0xFF8B0000).withOpacity(0.1),
+                    (Set<WidgetState> states) =>
+                        const Color(0xFF8B0000).withOpacity(0.1),
                   ),
                   columns: const [
                     DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Matricule', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Nom', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Matricule',style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Nom',style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Prénom', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Absences', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Congés', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Heures supp.', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn( label: Text('Absences',style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Congés',style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Heures supp.',style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
                   rows: employes.map((employe) {
                     return DataRow(
                       cells: [
                         DataCell(
-                          IconButton(
-                            icon: const Icon(Icons.history, color: Color(0xFF8B0000)),
-                            onPressed: () {
-                              final employeId = employe['id']?.toString() ?? employe['utilisateur']['id']?.toString();
-                              if (employeId == null) return;
-                              Get.to(
-                                () => EmployePointageHistoryScreen(
-                                  employeId: employeId,
-                                  chefId: authController.userId.value,
-                                ),
-                              );
-                            },
+                          Row(
+                            children: [
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () =>
+                                    _showUpdateEmployeDialog(employe),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.history,
+                                    color: Color(0xFF8B0000)),
+                                onPressed: () {
+                                  final employeId = employe['id']?.toString() ??
+                                      employe['utilisateur']['id']?.toString();
+                                  if (employeId == null) return;
+                                  Get.to(
+                                    () => EmployePointageHistoryScreen(
+                                      employeId: employeId,
+                                      chefId: authController.userId.value,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
                         DataCell(Text(employe['utilisateur']['matricule'] ?? 'N/A')),
@@ -275,7 +380,9 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
                         DataCell(
                           _buildStatCell(
                             employe['nbAbsences']?.toString() ?? '0',
-                            (employe['nbAbsences'] ?? 0) > 0 ? Colors.orange : Colors.green,
+                            (employe['nbAbsences'] ?? 0) > 0
+                                ? Colors.orange
+                                : Colors.green,
                           ),
                         ),
                         DataCell(
@@ -287,7 +394,9 @@ class _ChefEquipeDashboardScreenState extends State<ChefEquipeDashboardScreen> {
                         DataCell(
                           _buildStatCell(
                             employe['heuresSupp']?.toStringAsFixed(1) ?? '0.0',
-                            (employe['heuresSupp'] ?? 0) > 0 ? Colors.purple : Colors.grey,
+                            (employe['heuresSupp'] ?? 0) > 0
+                                ? Colors.purple
+                                : Colors.grey,
                           ),
                         ),
                       ],

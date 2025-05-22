@@ -378,107 +378,107 @@ class HistoriqueDemandesPage extends StatelessWidget {
     }
   }
 
-  void _showModifierDemandeDialog(Map<String, dynamic> demande) {
-    final TextEditingController raisonController =
-        TextEditingController(text: demande['raison'] ?? '');
-    DateTime dateDebut = DateTime.parse(demande['dateDebut']);
-    Rx<DateTime?> dateFin =
-        (demande['dateFin'] != null ? DateTime.parse(demande['dateFin']) : null)
-            .obs;
+void _showModifierDemandeDialog(Map<String, dynamic> demande) {
+  final TextEditingController raisonController =
+      TextEditingController(text: demande['raison'] ?? '');
+  DateTime dateDebut = DateTime.parse(demande['dateDebut']);
+  DateTime? dateFin = demande['dateFin'] != null 
+      ? DateTime.parse(demande['dateFin']) 
+      : null;
+  
+  final selectedDateFin = Rx<DateTime?>(dateFin);
 
-    Get.dialog(
-      AlertDialog(
-        title: const Text("Modifier la demande"),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextFormField(
-                controller: raisonController,
-                decoration: const InputDecoration(
-                  labelText: 'Raison',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
+  Get.dialog(
+    AlertDialog(
+      title: const Text("Modifier la demande"),
+      content: SingleChildScrollView(
+        child: Column(
+          children: [
+            TextFormField(
+              controller: raisonController,
+              decoration: const InputDecoration(
+                labelText: 'Raison',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 10),
-              Obx(() => ListTile(
-                    title: const Text("Date début"),
-                    subtitle: Text(DateFormat('dd/MM/yyyy').format(dateDebut)),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: Get.context!,
-                        initialDate: dateDebut,
-                        firstDate:
-                            DateTime.now().subtract(const Duration(days: 365)),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null && picked != dateDebut) {
-                        dateDebut = picked;
-                      }
-                    },
-                  )),
-              Obx(() => ListTile(
-                    title: const Text("Date fin"),
-                    subtitle: Text(
-                      dateFin.value != null
-                          ? DateFormat('dd/MM/yyyy').format(dateFin.value!)
-                          : 'Non définie',
-                    ),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: Get.context!,
-                        initialDate: dateFin.value ?? dateDebut,
-                        firstDate:
-                            DateTime.now().subtract(const Duration(days: 365)),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) {
-                        dateFin.value = picked;
-                      }
-                    },
-                  )),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text("Annuler"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF8B0000),
+              maxLines: 3,
             ),
-            onPressed: () {
-              if (dateFin.value != null && dateFin.value!.isBefore(dateDebut)) {
-                Get.snackbar(
-                  'Erreur',
-                  'La date de fin doit être après la date de début',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
+            const SizedBox(height: 10),
+            ListTile(
+              title: const Text("Date début"),
+              subtitle: Text(DateFormat('dd/MM/yyyy').format(dateDebut)),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: Get.context!,
+                  initialDate: dateDebut,
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
-                return;
-              }
-
-              final updatedData = {
-                'dateDebut': dateDebut.toIso8601String(),
-                'dateFin': dateFin.value?.toIso8601String(),
-                'raison': raisonController.text,
-                'type': demande['type'],
-                'userId': employeId,
-              };
-
-              controller.updateDemande(demande['id'], updatedData);
-              Get.back();
-            },
-            child: const Text("Enregistrer"),
-          ),
-        ],
+                if (picked != null && picked != dateDebut) {
+                  dateDebut = picked;
+                }
+              },
+            ),
+            Obx(() => ListTile(
+              title: const Text("Date fin"),
+              subtitle: Text(
+                selectedDateFin.value != null
+                    ? DateFormat('dd/MM/yyyy').format(selectedDateFin.value!)
+                    : 'Non définie',
+              ),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: Get.context!,
+                  initialDate: selectedDateFin.value ?? dateDebut,
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (picked != null) {
+                  selectedDateFin.value = picked;
+                }
+              },
+            )),
+          ],
+        ),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(),
+          child: const Text("Annuler"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF8B0000),
+          ),
+          onPressed: () {
+            if (selectedDateFin.value != null && selectedDateFin.value!.isBefore(dateDebut)) {
+              Get.snackbar(
+                'Erreur',
+                'La date de fin doit être après la date de début',
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
+              return;
+            }
+
+            final updatedData = {
+              'dateDebut': dateDebut.toIso8601String(),
+              'dateFin': selectedDateFin.value?.toIso8601String(),
+              'raison': raisonController.text,
+              'type': demande['type'],
+              'userId': employeId,
+            };
+
+            controller.updateDemande(demande['id'], updatedData);
+            Get.back();
+          },
+          child: const Text("Enregistrer"),
+        ),
+      ],
+    ),
+  );
+}
 
   void _showDeleteConfirmationDialog(String demandeId) {
     Get.dialog(

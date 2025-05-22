@@ -30,66 +30,62 @@ class DemandeController extends GetxController {
     'congé': 'CONGE',
     'autorization_sortie': 'AUTORISATION_SORTIE'
   };
-  String employeId = '';
 
   @override
   void onInit() {
     super.onInit();
-    final authProvider = Get.find<AuthProvider>();
-    if (!authProvider.isAuthenticated.value) {
-      Get.offAllNamed('/login');
-      return;
-    }
+    ever(authProvider.userId, (userId) {
+      if (userId.isEmpty) {
+        Get.offAllNamed('/login');
+      } else {
+        loadSoldeConges();
+      }
+    });
 
-    employeId = authProvider.userId.value;
-    
-    if (employeId.isEmpty) {
-      Get.offAllNamed('/login');
-      return;
+    if (authProvider.userId.value.isNotEmpty) {
+      loadSoldeConges();
     }
-
-    loadSoldeConges();
   }
 
   Future<void> loadSoldeConges() async {
     try {
-      final employeId = Get.parameters['employeId'] ?? '';
+      final employeId = authProvider.userId.value;
       if (employeId.isEmpty) {
-        Get.snackbar('Erreur', 'ID employé non disponible');
-        return;
+        throw Exception('User ID not available');
       }
       
       final solde = await demandeService.getSoldeConges(employeId);
       soldeConges.value = solde;
     } catch (e) {
-      print('Error loading solde: $e');
+      debugPrint('Error loading solde: $e');
       soldeConges.value = 30;
+      Get.snackbar('Erreur', 'Impossible de charger le solde de congés');
     }
   }
 
   Future<void> selectDateTime(TextEditingController controller, bool isStartDate) async {
     DateTime? date = await showDatePicker(
-    context: Get.context!,
-    initialDate: DateTime.now(),
-    firstDate: DateTime(2020),
-    lastDate: DateTime(2101),
-    builder: (context, child) {
-      return Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: Color(0xFF8B0000),
-            onPrimary: Colors.white,
-            surface: Colors.white,
-            onSurface: Color(0xFF8B0000),
+      context: Get.context!,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2101),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF8B0000),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF8B0000),
+            ),
+            dialogTheme: DialogTheme(
+              backgroundColor: Colors.white,
+            ),
           ),
-          dialogTheme: DialogTheme(
-            backgroundColor: Colors.white,
-          ),
-        ),
-        child: child!,
-      );
-    },
-  );
+          child: child!,
+        );
+      },
+    );
 
     if (date != null) {
       TimeOfDay? time = await showTimePicker(
@@ -122,23 +118,12 @@ class DemandeController extends GetxController {
     }
   }
 
-  // Simuler l'approbation d'une demande
-  Future<void> simulateApproval(String demandeId) async {
-    await Future.delayed(Duration(seconds: 2));
-   
-  }
-
-  // Simuler le rejet d'une demande
-  Future<void> simulateRejection(String demandeId) async {
-    await Future.delayed(Duration(seconds: 2));
-   
-  }
-
   Future<void> submitForm() async {
     if (!formKey.currentState!.validate()) {
       return;
     }
 
+    final employeId = authProvider.userId.value;
     if (employeId.isEmpty) {
       Get.snackbar('Erreur', 'ID employé manquant');
       return;
@@ -149,7 +134,13 @@ class DemandeController extends GetxController {
       return;
     }
 
-    final backendType = typeMapping[typeDemande.value!.toLowerCase()];
+    final typeValue = typeDemande.value;
+    if (typeValue == null) {
+      Get.snackbar('Erreur', 'Veuillez sélectionner un type de demande');
+      return;
+    }
+
+    final backendType = typeMapping[typeValue.toLowerCase()];
     if (backendType == null) {
       Get.snackbar('Erreur', 'Type de demande invalide');
       return;
@@ -163,18 +154,15 @@ class DemandeController extends GetxController {
         'type': backendType,
         'dateDebut': dateDebut.value!.toIso8601String(),
         'dateFin': dateFin.value?.toIso8601String(),
-        'raison': raison.value,
+        'raison': raison.value ?? '',
       };
 
-      // Simuler la création d'une demande avec un ID aléatoire
       final demandeId = DateTime.now().millisecondsSinceEpoch.toString();
       final success = await demandeService.createDemande(demande);
       
       if (success) {
-        // Notification pour l'employé
         lastNotification.value = "Votre demande a été envoyée avec succès";
         
-        // Notification pour le RH (simulée)
         notificationService.addRHNotification(
           'Nouvelle demande de ${authProvider.prenom.value} ${authProvider.nom.value} (${typeDemande.value})',
           demandeId: demandeId,
@@ -189,14 +177,6 @@ class DemandeController extends GetxController {
           textColor: Colors.white,
           fontSize: 16.0
         );
-
-        // Simuler une réponse aléatoire (approbation ou rejet)
-        final randomResponse = DateTime.now().second % 2 == 0;
-        if (randomResponse) {
-          await simulateApproval(demandeId);
-        } else {
-          await simulateRejection(demandeId);
-        }
 
         formKey.currentState?.reset();
         typeDemande.value = null;
@@ -234,93 +214,97 @@ class DemandeController extends GetxController {
 class DemandeScreen extends StatelessWidget {
   final DemandeController controller = Get.put(DemandeController());
 
+  DemandeScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    final args = Get.arguments;
-    if (args != null && args['employeId'] != null) {
-      controller.employeId = args['employeId'].toString();
-    }
-    
     return EmployeeLayout(
       title: 'Nouvelle Demande',
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Form(
-                    key: controller.formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Nouvelle Demande',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF8B0000),
+      child: Obx(() {
+        final authProvider = Get.find<AuthProvider>();
+        if (authProvider.userId.value.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Form(
+              key: controller.formKey,
+              child: Column(
+                children: [
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Nouvelle Demande',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF8B0000),
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildDropdownField(),
-                        const SizedBox(height: 16),
-                        _buildReasonField(),
-                        const SizedBox(height: 16),
-                        _buildDateField(controller.dateDebutController, "Date de début *", true),
-                        const SizedBox(height: 16),
-                        _buildDateField(controller.dateFinController, "Date de fin (optionnelle)", false),
-                        Obx(() => controller.typeDemande.value == 'congé'
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Solde disponible: ${controller.soldeConges.value} jours',
-                                      style: TextStyle(
-                                        color: controller.soldeConges.value > 0
-                                            ? Color(0xFF8B0000)
-                                            : Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (controller.soldeConges.value <= 0)
-                                      const Padding(
-                                        padding: EdgeInsets.only(top: 4.0),
-                                        child: Text(
-                                          'Vous n\'avez plus de jours de congé disponibles',
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 12,
-                                          ),
+                          const SizedBox(height: 20),
+                          _buildDropdownField(),
+                          const SizedBox(height: 16),
+                          _buildReasonField(),
+                          const SizedBox(height: 16),
+                          _buildDateField(controller.dateDebutController, "Date de début *", true),
+                          const SizedBox(height: 16),
+                          _buildDateField(controller.dateFinController, "Date de fin (optionnelle)", false),
+                          Obx(() => controller.typeDemande.value == 'congé'
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Solde disponible: ${controller.soldeConges.value} jours',
+                                        style: TextStyle(
+                                          color: controller.soldeConges.value > 0
+                                              ? Color(0xFF8B0000)
+                                              : Colors.red,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                  ],
-                                ),
-                              )
-                            : SizedBox.shrink()),
-                        const SizedBox(height: 24),
-                        _buildSubmitButton(),
-                        Obx(() => controller.lastNotification.value != null
-                            ? _buildNotificationBadge()
-                            : SizedBox.shrink()),
-                      ],
+                                      if (controller.soldeConges.value <= 0)
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 4.0),
+                                          child: Text(
+                                            'Vous n\'avez plus de jours de congé disponibles',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                )
+                              : const SizedBox()),
+                          const SizedBox(height: 24),
+                          _buildSubmitButton(),
+                          Obx(() => controller.lastNotification.value != null
+                              ? _buildNotificationBadge()
+                              : const SizedBox()),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -391,7 +375,7 @@ class DemandeScreen extends StatelessWidget {
     return Obx(() => ElevatedButton(
           onPressed: controller.isSubmitting.value ? null : controller.submitForm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF8B0000),
+            backgroundColor: const Color(0xFF8B0000),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -433,7 +417,7 @@ class DemandeScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.notifications, color: Color(0xFF8B0000)),
+                const Icon(Icons.notifications, color: Color(0xFF8B0000)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(controller.lastNotification.value ?? ''),

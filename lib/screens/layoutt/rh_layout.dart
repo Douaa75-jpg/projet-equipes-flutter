@@ -27,7 +27,8 @@ class RhLayout extends StatefulWidget {
 }
 
 class _RhLayoutState extends State<RhLayout> {
-  final NotificationService notificationService = Get.find<NotificationService>();
+  final NotificationService notificationService =
+      Get.find<NotificationService>();
   final AuthProvider authProvider = Get.find<AuthProvider>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GetStorage box = GetStorage();
@@ -57,64 +58,97 @@ class _RhLayoutState extends State<RhLayout> {
 
   Widget _buildUserInfo({bool isMobile = false}) {
     return Obx(() {
-      final displayName = (authProvider.prenom.value.isEmpty && authProvider.nom.value.isEmpty)
-          ? 'welcome'.tr
-          : '${authProvider.prenom.value} ${authProvider.nom.value}'.trim();
+      final displayName =
+          (authProvider.prenom.value.isEmpty && authProvider.nom.value.isEmpty)
+              ? 'welcome'.tr
+              : '${authProvider.prenom.value} ${authProvider.nom.value}'.trim();
 
       return Container(
         padding: EdgeInsets.symmetric(
-          vertical: isMobile ? 6 : 8,
-          horizontal: isMobile ? 10 : 12,
+          vertical: isMobile ? 8 : 12,
+          horizontal: isMobile ? 12 : 16,
         ),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.2),
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Avatar Circle with status indicator
+            Container(
+              width: isMobile ? 32 : 40,
+              height: isMobile ? 32 : 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue[50],
+                border: Border.all(
+                  color: Colors.blue,
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.person,
+                  size: isMobile ? 16 : 20,
+                  color: Colors.blue[700],
+                ),
+              ),
+            ),
+
+            SizedBox(width: isMobile ? 8 : 12),
+
+            // User Info Column
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'welcome'.tr,
                   style: TextStyle(
-                    color: Colors.grey,
+                    color: Colors.grey[600],
                     fontSize: isMobile ? 10 : 12,
-                    fontWeight: FontWeight.w300,
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
                 Text(
                   displayName,
                   style: TextStyle(
                     color: Colors.black,
-                    fontSize: isMobile ? 12 : 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            SizedBox(width: isMobile ? 6 : 8),
-            Icon(
-              Icons.person_outline,
-              color: Colors.blue,
-              size: isMobile ? 20 : 24,
+
+            SizedBox(width: isMobile ? 4 : 8),
+
+            // Status Indicator
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.3),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       );
     });
   }
-
- 
 
   void _showNotificationsDialog() {
     Get.dialog(
@@ -136,9 +170,9 @@ class _RhLayoutState extends State<RhLayout> {
                 final notification = notificationService.notifications[index];
                 return ListTile(
                   leading: Icon(
-                    notification['type'] == 'rh_response' 
-                      ? Icons.work 
-                      : Icons.person,
+                    notification['type'] == 'rh_response'
+                        ? Icons.work
+                        : Icons.person,
                     size: 20,
                   ),
                   title: Text(
@@ -186,11 +220,16 @@ class _RhLayoutState extends State<RhLayout> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _buildNavItem(context, 'accueil'.tr, '/accueilRH', _currentRoute == '/accueilRH'),
-          _buildNavItem(context, 'Tableau de bord'.tr, '/dashboard', _currentRoute == '/dashboard'),
-          _buildNavItem(context, 'employees'.tr, '/liste-employes', _currentRoute == '/liste-employes'),
-          _buildNavItem(context, 'chefs_équipe'.tr, '/liste-chefs', _currentRoute == '/liste-chefs'),
-          _buildNavItem(context, 'Toutes les demandes'.tr, '/Notifications', _currentRoute == '/Notifications'),
+          _buildNavItem(context, 'accueil'.tr, '/accueilRH',
+              _currentRoute == '/accueilRH'),
+          _buildNavItem(context, 'Tableau de bord'.tr, '/dashboard',
+              _currentRoute == '/dashboard'),
+          _buildNavItem(context, 'employees'.tr, '/liste-employes',
+              _currentRoute == '/liste-employes'),
+          _buildNavItem(context, 'chefs_équipe'.tr, '/liste-chefs',
+              _currentRoute == '/liste-chefs'),
+          _buildNavItem(context, 'Toutes les demandes'.tr, '/Notifications',
+              _currentRoute == '/Notifications'),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.search, color: Colors.white, size: 22),
@@ -224,25 +263,28 @@ class _RhLayoutState extends State<RhLayout> {
                 ),
                 const SizedBox(height: 10),
                 Obx(() => Text(
-                  '${authProvider.prenom.value} ${authProvider.nom.value}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )),
+                      '${authProvider.prenom.value} ${authProvider.nom.value}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )),
               ],
             ),
           ),
           _buildMobileNavItem(context, Icons.home, 'home'.tr, '/accueilRH'),
-          _buildMobileNavItem(context, Icons.dashboard, 'dashboard'.tr, '/dashboard'),
-          _buildMobileNavItem(context, Icons.people, 'employees'.tr, '/liste-employes'),
-          _buildMobileNavItem(context, Icons.people_outline, 'team_leaders'.tr, '/liste-chefs'),
+          _buildMobileNavItem(
+              context, Icons.dashboard, 'dashboard'.tr, '/dashboard'),
+          _buildMobileNavItem(
+              context, Icons.people, 'employees'.tr, '/liste-employes'),
+          _buildMobileNavItem(
+              context, Icons.people_outline, 'team_leaders'.tr, '/liste-chefs'),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings),
             title: Text('settings'.tr),
-            onTap: () { 
+            onTap: () {
               Navigator.pop(context);
               _showSettingsDialog(context);
             },
@@ -257,10 +299,20 @@ class _RhLayoutState extends State<RhLayout> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatusItem(Icons.update,
-                    'last_update'.trParams({'time': DateFormat('HH:mm').format(DateTime.now())})),
-                const SizedBox(height: 8),
-                _buildStatusItem(Icons.cloud, 'services_online'.tr, isOnline: true),
+                Row(
+                  children: [
+                    Icon(Icons.update, size: 16, color: Colors.grey[700]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'last_update'.trParams(
+                          {'time': DateFormat('HH:mm').format(DateTime.now())}),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -325,23 +377,8 @@ class _RhLayoutState extends State<RhLayout> {
     );
   }
 
-  Widget _buildStatusItem(IconData icon, String text, {bool isOnline = false}) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: isOnline ? Colors.green : Colors.grey[700]),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[700],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavItem(BuildContext context, String title, String route, bool isActive) {
+  Widget _buildNavItem(
+      BuildContext context, String title, String route, bool isActive) {
     return InkWell(
       onTap: () => _navigateToRoute(route),
       child: Padding(
@@ -369,7 +406,8 @@ class _RhLayoutState extends State<RhLayout> {
     );
   }
 
-  Widget _buildMobileNavItem(BuildContext context, IconData icon, String title, String route) {
+  Widget _buildMobileNavItem(
+      BuildContext context, IconData icon, String title, String route) {
     return ListTile(
       leading: Icon(icon),
       title: Text(title),
@@ -421,7 +459,7 @@ class _RhLayoutState extends State<RhLayout> {
 
   void _navigateToRoute(String route) {
     if (route == _currentRoute) return;
-    
+
     switch (route) {
       case '/accueilRH':
         Get.offAll(() => const AccueilRh());
@@ -430,10 +468,11 @@ class _RhLayoutState extends State<RhLayout> {
         Get.offAll(() => RHDashboardScreen());
         break;
       case '/liste-employes':
-        Get.offAll(() =>  ListeEmployeScreen());
+        Get.offAll(() => ListeEmployeScreen());
         break;
       case '/liste-chefs':
-        Get.offAll(() => ListeChefScreen(notificationService: notificationService));
+        Get.offAll(
+            () => ListeChefScreen(notificationService: notificationService));
         break;
       case '/Notifications':
         Get.offAll(() => GestionDemandeScreen());
@@ -487,21 +526,59 @@ class _RhLayoutState extends State<RhLayout> {
               children: [
                 Image.asset(
                   'assets/logo.png',
-                  height: isMobile ? 40 : (isTablet ? 50 : 60),
-                  width: isMobile ? 40 : (isTablet ? 50 : 60),
+                  height: isMobile ? 70 : (isTablet ? 80 : 90),
+                  width: isMobile ? 70 : (isTablet ? 80 : 90),
                   fit: BoxFit.contain,
                 ),
                 if (!isMobile) const Spacer(),
-                if (!isMobile) 
-                  Row(
-                    children: [
-                      _buildUserInfo(isMobile: isMobile),
-                      const SizedBox(width: 16),
-                      _buildStatusItem(Icons.cloud, 'services_online'.tr, isOnline: true),
-                    ],
-                  ),
+                if (!isMobile) _buildUserInfo(isMobile: isMobile),
               ],
             ),
+            actions: [
+              Obx(() {
+                final unreadCount = Get.find<NotificationService>()
+                    .notifications
+                    .where((n) =>
+                        n['type'] == 'rh_response' &&
+                        !(n['isRead'] as bool? ?? false))
+                    .length;
+
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications),
+                      onPressed: () => Get.find<NotificationService>()
+                          .showRHNotificationsDialog(),
+                      tooltip: 'notifications'.tr,
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }),
+            ],
             backgroundColor: Colors.white,
             elevation: 1,
             iconTheme: const IconThemeData(color: Colors.black),
